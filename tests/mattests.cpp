@@ -45,8 +45,10 @@ TEST_CASE("arithmetic and boolean") {
         Matrix<bool> result(2, 3);
         result = A == 2;
         expected = {false, true, false, false, true, false};
+        REQUIRE((result==expected).all_equal(true));
         REQUIRE(result.all_equal(expected));
         REQUIRE(A.sum() == 12);
+        A.print();
     }
     SUBCASE("matrix addition") {
         Matrix<int> B(2, 3);
