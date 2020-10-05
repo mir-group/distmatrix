@@ -2,16 +2,17 @@
 #include <doctest.h>
 #include <distmatrix.h>
 #include <mpi.h>
+#include <blacs.h>
 
 int main(int argc, char **argv) {
     MPI_Init(&argc, &argv);
-    DistMatrix<int>::initialize();
+    blacs::initialize();
     doctest::Context context;
 
     context.applyCommandLine(argc, argv);
 
     int res = context.run();// run
-    DistMatrix<int>::finalize(0);
+    blacs::finalize(0);
     MPI_Finalize();
 
     if (context.shouldExit())// important - query flags (and --exit) rely on the user doing this

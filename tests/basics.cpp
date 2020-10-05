@@ -1,3 +1,4 @@
+#include <blacs.h>
 #include <distmatrix.h>
 #include <doctest.h>
 #include <iostream>
@@ -7,7 +8,7 @@
 TEST_CASE_TEMPLATE("assignment and copy", MatType, Matrix<int>, DistMatrix<int>) {
     MatType A(3, 4);
     MatType B = A;
-    int rank = DistMatrix<int>::mpirank;
+    int rank = blacs::mpirank;
     //    A.fence();
     int should_set = rank == 0 || std::is_same_v<MatType, Matrix<int>>;
     if (should_set) A.set(1, 2, 3);
@@ -65,22 +66,20 @@ TEST_CASE("lambda init and transform") {
 TEST_CASE("arithmetic and boolean") {
     Matrix<int> A(2, 3);
     A = 2;
-    REQUIRE(A.all_equal(2));
-    REQUIRE((A == 2).all_equal(true));
+    REQUIRE((A == 2));
     SUBCASE("rescale and add") {
         A *= 5;
-        REQUIRE(A.all_equal(10));
+        REQUIRE((A == 10));
         A += 3;
-        REQUIRE(A.all_equal(13));
+        REQUIRE((A == 13));
     }
     SUBCASE("equality between matrices, sum") {
         A = {1, 2, 3, 1, 2, 3};
         Matrix<bool> expected(2, 3);
         Matrix<bool> result(2, 3);
-        result = A == 2;
+        result = [&A](int i, int j) { return A(i, j) == 2; };
         expected = {false, true, false, false, true, false};
-        REQUIRE((result == expected).all_equal(true));
-        REQUIRE(result.all_equal(expected));
+        REQUIRE((result == expected));
         REQUIRE(A.sum() == 12);
     }
     SUBCASE("matrix addition") {
@@ -88,6 +87,6 @@ TEST_CASE("arithmetic and boolean") {
         A = {1, 2, 3, 1, 2, 3};
         B = {3, 2, 1, 3, 2, 1};
         A += B;
-        REQUIRE(A.all_equal(4));
+        REQUIRE((A == 4));
     }
 }

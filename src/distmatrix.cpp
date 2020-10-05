@@ -1,62 +1,34 @@
 
-#include <blacs.h>
 #include <distmatrix.h>
+#include <extern_blacs.h>
 #include <iostream>
 #include <mpi.h>
+#include <blacs.h>
 
 void delete_window(MPI_Win *window) {
     MPI_Win_free(window);
     delete window;
 }
 
-template<class ValueType>
-void DistMatrix<ValueType>::initialize(int nprows, int npcols) {
-    int rank, size, context, myprow, mypcol;
-    char layout = DistMatrix<ValueType>::blacslayout;
-    blacs_pinfo_(&rank, &size);
-    DistMatrix<ValueType>::mpisize = size;
-    DistMatrix<ValueType>::mpirank = rank;
-    if (nprows < 1 || npcols < 1) {
-        std::vector<int> dims(2);
-        MPI_Dims_create(size, 2, &dims[0]);
-        nprows = dims[0];
-        npcols = dims[1];
-    }
-    int blah = -1, what = 0;
-    blacs_get_(&blah, &what, &context);
-    blacs_gridinit_(&context, &layout, &nprows, &npcols);
-    blacs_gridinfo_(&context, &nprows, &npcols, &myprow, &mypcol);
-    DistMatrix<ValueType>::nprows = nprows;
-    DistMatrix<ValueType>::npcols = npcols;
-    DistMatrix<ValueType>::blacscontext = context;
-    DistMatrix<ValueType>::myprow = myprow;
-    DistMatrix<ValueType>::mypcol = mypcol;
-    std::cout << "Hello from rank " << rank << " = (" << myprow << "," << mypcol << ")\n";
-    MPI_Barrier(MPI_COMM_WORLD);
-}
-template<class ValueType>
-void DistMatrix<ValueType>::finalize(int finalize_mpi) {
-    int cont = !finalize_mpi;
-    blacs_exit_(&cont);
-}
+
 
 template<class ValueType>
 DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperblock_, int ncolsperblock_) : nrowsperblock(nrowsperblock_), ncolsperblock(ncolsperblock_),
                                                                                                           Matrix<ValueType>(ndistrows, ndistcols), mpiwindow(new MPI_Win, delete_window) {
-    if (nprows > ndistrows || npcols > ndistcols) {
+    if (blacs::nprows > ndistrows || blacs::npcols > ndistcols) {
         throw std::logic_error("process grid is larger than matrix - TODO");
     }
     if (nrowsperblock < 1 || ncolsperblock < 1) {
-        nrowsperblock = std::max(1, ndistrows / nprows);
-        ncolsperblock = std::max(1, ndistcols / npcols);
+        nrowsperblock = std::max(1, ndistrows / blacs::nprows);
+        ncolsperblock = std::max(1, ndistcols / blacs::npcols);
     }
     int zero = 0;
     int info;
-    std::tie(this->nlocalrows, this->nlocalcols) = getlocalsizes(myprow, mypcol);
+    std::tie(this->nlocalrows, this->nlocalcols) = getlocalsizes(blacs::myprow, blacs::mypcol);
 
     this->nlocal = (this->nlocalrows) * (this->nlocalcols);
     this->array = std::shared_ptr<ValueType[]>(new ValueType[this->nlocal]);
-    descinit_(&desc[0], &ndistrows, &ndistcols, &nrowsperblock, &ncolsperblock, &zero, &zero, &DistMatrix<ValueType>::blacscontext, &this->nlocalrows, &info);
+    descinit_(&desc[0], &ndistrows, &ndistcols, &nrowsperblock, &ncolsperblock, &zero, &zero, &blacs::blacscontext, &this->nlocalrows, &info);
     if (info != 0) {
         std::cerr << "info = " << info << std::endl;
         throw std::runtime_error("DESCINIT error");
@@ -87,7 +59,7 @@ ValueType DistMatrix<ValueType>::operator()(int i, int j) {
     } else {
         int remoteidx = flatten(i, j);
         auto [ip, jp] = g2p(i, j);
-        int remoterank = ip * DistMatrix<ValueType>::npcols + jp;
+        int remoterank = ip * blacs::npcols + jp;
         ValueType result;
         MPI_Win_lock(MPI_LOCK_SHARED, remoterank, 0, *mpiwindow);
         MPI_Get(&result, 1, mpitype, remoterank, remoteidx, 1, mpitype, *mpiwindow);
@@ -103,7 +75,7 @@ void DistMatrix<ValueType>::set(int i, int j, const ValueType x) {
     } else {
         int remoteidx = flatten(i, j);
         auto [ip, jp] = g2p(i, j);
-        int remoterank = ip * DistMatrix<ValueType>::npcols + jp;
+        int remoterank = ip * blacs::npcols + jp;
         auto [rr, rc] = getlocalsizes(ip, jp);
 //        std::cout << ip << ", " << jp << ", " << rr << ", " << rc << ", " << remoterank << ", " << remoteidx << "\n";
         MPI_Win_lock(MPI_LOCK_EXCLUSIVE, remoterank, 0, *mpiwindow);
@@ -126,8 +98,8 @@ std::pair<int, int> DistMatrix<ValueType>::l2g(int ilocal, int jlocal) {
     ilocal++;
     jlocal++;
     int zero = 0;
-    int i = indxl2g_(&ilocal, &nrowsperblock, &DistMatrix<ValueType>::myprow, &zero, &DistMatrix<ValueType>::nprows) - 1;
-    int j = indxl2g_(&jlocal, &ncolsperblock, &DistMatrix<ValueType>::mypcol, &zero, &DistMatrix<ValueType>::npcols) - 1;
+    int i = indxl2g_(&ilocal, &nrowsperblock, &blacs::myprow, &zero, &blacs::nprows) - 1;
+    int j = indxl2g_(&jlocal, &ncolsperblock, &blacs::mypcol, &zero, &blacs::npcols) - 1;
     return {i, j};
 }
 template<class ValueType>
@@ -135,8 +107,8 @@ std::pair<int, int> DistMatrix<ValueType>::g2l(int i, int j) {
     i++;
     j++;
     int zero = 0;
-    int ilocal = indxg2l_(&i, &nrowsperblock, &DistMatrix<ValueType>::myprow, &zero, &DistMatrix<ValueType>::nprows) - 1;
-    int jlocal = indxg2l_(&j, &ncolsperblock, &DistMatrix<ValueType>::mypcol, &zero, &DistMatrix<ValueType>::npcols) - 1;
+    int ilocal = indxg2l_(&i, &nrowsperblock, &blacs::myprow, &zero, &blacs::nprows) - 1;
+    int jlocal = indxg2l_(&j, &ncolsperblock, &blacs::mypcol, &zero, &blacs::npcols) - 1;
     return {ilocal, jlocal};
 }
 
@@ -145,14 +117,14 @@ std::pair<int, int> DistMatrix<ValueType>::g2p(int i, int j) {
     i++;
     j++;
     int zero = 0;
-    int ip = indxg2p_(&i, &nrowsperblock, &DistMatrix<ValueType>::myprow, &zero, &DistMatrix<ValueType>::nprows);
-    int jp = indxg2p_(&j, &ncolsperblock, &DistMatrix<ValueType>::mypcol, &zero, &DistMatrix<ValueType>::npcols);
+    int ip = indxg2p_(&i, &nrowsperblock, &blacs::myprow, &zero, &blacs::nprows);
+    int jp = indxg2p_(&j, &ncolsperblock, &blacs::mypcol, &zero, &blacs::npcols);
     return {ip, jp};
 }
 template<class ValueType>
 bool DistMatrix<ValueType>::islocal(int i, int j) {
     auto [ip, jp] = g2p(i, j);
-    return ip == myprow && jp == mypcol;
+    return ip == blacs::myprow && jp == blacs::mypcol;
 }
 template<class ValueType>
 int DistMatrix<ValueType>::flatten(int i, int j) {
@@ -163,14 +135,13 @@ int DistMatrix<ValueType>::flatten(int i, int j) {
     auto [ip, jp] = g2p(i, j);
     auto [ilocal, jlocal] = g2l(i, j);
     auto [remoterows, remotecols] = getlocalsizes(ip, jp);
-//    std::cout << i << "," << j << "," << ilocal << "," << jlocal << "," << ip << "," << jp << "," << remoterows << "," << remotecols << "\n";
     return jlocal * remoterows + ilocal;
 }
 template<class ValueType>
 std::pair<int, int> DistMatrix<ValueType>::getlocalsizes(int ip, int jp) {
     int zero = 0;
-    int nlocalrows = numroc_(&(this->nrows), &nrowsperblock, &ip, &zero, &nprows);
-    int nlocalcols = numroc_(&(this->ncols), &ncolsperblock, &jp, &zero, &npcols);
+    int nlocalrows = numroc_(&(this->nrows), &nrowsperblock, &ip, &zero, &blacs::nprows);
+    int nlocalcols = numroc_(&(this->ncols), &ncolsperblock, &jp, &zero, &blacs::npcols);
     return {nlocalrows, nlocalcols};
 }
 template<class ValueType>

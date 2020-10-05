@@ -1,5 +1,5 @@
-#ifndef DISTMATRIX_BLACS_H
-#define DISTMATRIX_BLACS_H
+#ifndef DISTMATRIX_EXTERN_BLACS_H
+#define DISTMATRIX_EXTERN_BLACS_H
 #include <complex>
 
 extern "C" {
@@ -43,4 +43,4 @@ void pzheev_(char *, char *, int *, std::complex<double> *, int *, int *, int *,
              std::complex<double> *, int *, std::complex<double> *, int *,
              int *);
 };
-#endif//DISTMATRIX_BLACS_H
+#endif//DISTMATRIX_EXTERN_BLACS_H

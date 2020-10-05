@@ -16,7 +16,9 @@
 #endif
 
 template<class ValueType>
-Matrix<ValueType>::Matrix(int nrows, int ncols) : nlocalrows(nrows), nlocalcols(ncols), nlocal(nrows * ncols), array(new ValueType[nrows * ncols]), nrows(nrows), ncols(ncols) {
+Matrix<ValueType>::Matrix(int nrows, int ncols) : nlocalrows(nrows), nlocalcols(ncols),
+                                                  nlocal(nrows * ncols), array(new ValueType[nrows * ncols]),
+                                                  nrows(nrows), ncols(ncols) {
     // array = std::make_shared<ValueType[]>(nlocal);
     ;
 }
@@ -123,16 +125,7 @@ ValueType Matrix<ValueType>::sum() {
 }
 
 template<class ValueType>
-Matrix<bool> Matrix<ValueType>::operator==(const ValueType x) {
-    Matrix<bool> A(nlocalrows, nlocalcols);
-    for (int i = 0; i < nlocal; i++) {
-        A.array[i] = array[i] == x;
-    }
-    return A;
-}
-
-template<class ValueType>
-bool Matrix<ValueType>::all_equal(const ValueType x) {
+bool Matrix<ValueType>::operator==(const ValueType x) {
     bool result = true;
     for (int i = 0; i < nlocal; i++) {
         result = result && (array[i] == x);
@@ -140,18 +133,10 @@ bool Matrix<ValueType>::all_equal(const ValueType x) {
     return result;
 }
 
-template<class ValueType>
-Matrix<bool> Matrix<ValueType>::operator==(const Matrix<ValueType> &A) {
-    Matrix<bool> result(nlocalrows, nlocalcols);
-    for (int i = 0; i < nlocal; i++) {
-        result.array[i] = array[i] == A.array[i];
-    }
-    return result;
-}
 
 template<class ValueType>
-bool Matrix<ValueType>::all_equal(const Matrix<ValueType> &A) {
-    bool result = true;
+bool Matrix<ValueType>::operator==(const Matrix<ValueType> &A) {
+  bool result = true;
     for (int i = 0; i < nlocal; i++) {
         result = result && (array[i] == A.array[i]);
     }

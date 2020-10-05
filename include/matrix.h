@@ -39,10 +39,9 @@ public:
             ComplexValueType;
     std::pair<std::vector<ComplexValueType>, Matrix<ComplexValueType>> diagonalize();
 
-    Matrix<bool> operator==(const ValueType x);
-    Matrix<bool> operator==(const Matrix<ValueType> &x);
-    bool all_equal(const ValueType x);
-    bool all_equal(const Matrix<ValueType> &A);
+    bool operator==(const ValueType x);
+    bool operator==(const Matrix<ValueType> &x);
+
 
     ValueType sum();
     void print();
