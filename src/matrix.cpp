@@ -46,9 +46,9 @@ ValueType Matrix<ValueType>::operator()(int i, int j) {
 
 template<class ValueType>
 void Matrix<ValueType>::print() {
-    for (int i = 0; i < nlocalrows; i++) {
-        for (int j = 0; j < nlocalcols; j++) {
-            std::cout << operator()(i,j) << " ";
+    for (int i = 0; i < nrows; i++) {
+        for (int j = 0; j < ncols; j++) {
+            std::cout << operator()(i, j) << " ";
         }
         std::cout << "\n";
     }
@@ -71,9 +71,12 @@ void Matrix<ValueType>::operator=(const ValueType x) {
 
 template<class ValueType>
 void Matrix<ValueType>::operator=(std::initializer_list<ValueType> x) {
-    for (int i = 0; i < nlocal; i++) {
-        array[i] = *(x.begin() + i);
+    for (int k = 0; k < nlocal; k++) {
+        auto [i, j] = unflatten(k);
+        int idx = j*nrows+i;
+        set(i, j, *(x.begin() + idx));
     }
+    std::cout << std::endl;
 }
 
 template<class ValueType>
@@ -136,7 +139,7 @@ bool Matrix<ValueType>::operator==(const ValueType x) {
 
 template<class ValueType>
 bool Matrix<ValueType>::operator==(const Matrix<ValueType> &A) {
-  bool result = true;
+    bool result = true;
     for (int i = 0; i < nlocal; i++) {
         result = result && (array[i] == A.array[i]);
     }

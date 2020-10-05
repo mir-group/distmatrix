@@ -10,8 +10,6 @@ void delete_window(MPI_Win *window) {
     delete window;
 }
 
-
-
 template<class ValueType>
 DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperblock_, int ncolsperblock_) : nrowsperblock(nrowsperblock_), ncolsperblock(ncolsperblock_),
                                                                                                           Matrix<ValueType>(ndistrows, ndistcols), mpiwindow(new MPI_Win, delete_window) {
@@ -77,7 +75,6 @@ void DistMatrix<ValueType>::set(int i, int j, const ValueType x) {
         auto [ip, jp] = g2p(i, j);
         int remoterank = ip * blacs::npcols + jp;
         auto [rr, rc] = getlocalsizes(ip, jp);
-//        std::cout << ip << ", " << jp << ", " << rr << ", " << rc << ", " << remoterank << ", " << remoteidx << "\n";
         MPI_Win_lock(MPI_LOCK_EXCLUSIVE, remoterank, 0, *mpiwindow);
         MPI_Put(&x, 1, mpitype, remoterank, remoteidx, 1, mpitype, *mpiwindow);
         MPI_Win_unlock(remoterank, *mpiwindow);
@@ -150,8 +147,25 @@ void DistMatrix<ValueType>::fence() {
 //    MPI_Win_flush_all(*mpiwindow);
 }
 template<class ValueType>
-void DistMatrix<ValueType>::barrier() {
-    MPI_Barrier(MPI_COMM_WORLD);
+bool DistMatrix<ValueType>::operator==(const ValueType x) {
+    bool local_equal = Matrix<ValueType>::operator==(x);
+    bool result;
+    MPI_Allreduce(&local_equal, &result, 1, MPI_CXX_BOOL, MPI_LAND, MPI_COMM_WORLD);
+    return result;
+}
+template<class ValueType>
+bool DistMatrix<ValueType>::operator==(const Matrix<ValueType> &x) {
+    bool local_equal = Matrix<ValueType>::operator==(x);
+    bool result;
+    MPI_Allreduce(&local_equal, &result, 1, MPI_CXX_BOOL, MPI_LAND, MPI_COMM_WORLD);
+    return result;
+}
+template<class ValueType>
+ValueType DistMatrix<ValueType>::sum() {
+    ValueType local_sum = Matrix<ValueType>::sum();
+    ValueType result;
+    MPI_Allreduce(&local_sum, &result, 1, mpitype, MPI_SUM, MPI_COMM_WORLD);
+    return result;
 }
 
 

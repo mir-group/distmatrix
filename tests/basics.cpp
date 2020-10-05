@@ -13,7 +13,7 @@ TEST_CASE_TEMPLATE("assignment and copy", MatType, Matrix<int>, DistMatrix<int>)
     int should_set = rank == 0 || std::is_same_v<MatType, Matrix<int>>;
     if (should_set) A.set(1, 2, 3);
 
-    A.barrier();
+    blacs::barrier();
 
     SUBCASE("assignment with reference semantics") {
         REQUIRE(A.nrows == 3);
@@ -22,6 +22,11 @@ TEST_CASE_TEMPLATE("assignment and copy", MatType, Matrix<int>, DistMatrix<int>)
         REQUIRE(B.ncols == 4);
         REQUIRE(B.nrows == 3);
         REQUIRE(B(1, 2) == 3);
+        if constexpr (std::is_same_v<MatType, DistMatrix<int>>) {
+            REQUIRE(A.nlocalrows == B.nlocalrows);
+            REQUIRE(A.nlocalcols == B.nlocalcols);
+            REQUIRE(A.nlocal == B.nlocal);
+        }
     }
     SUBCASE("copy constructor with reference semantics") {
         MatType C(A);
@@ -29,25 +34,26 @@ TEST_CASE_TEMPLATE("assignment and copy", MatType, Matrix<int>, DistMatrix<int>)
         REQUIRE(C.nrows == 3);
         REQUIRE(C(1, 2) == 3);
         if (should_set) A.set(0, 0, 4);
-        A.barrier();
+        blacs::barrier();
         REQUIRE(C(0, 0) == 4);
     }
     SUBCASE("explicit deep copy") {
         MatType C(3, 4);
         A.copy_to(C);
+        blacs::barrier();
         if (should_set) A.set(1, 2, 7);
-        //        A.fence();
         REQUIRE(C.ncols == 4);
         REQUIRE(C.nrows == 3);
         REQUIRE(C(1, 2) == 3);
     }
 }
 
-TEST_CASE("lambda init and transform") {
-    Matrix<int> A(3, 4);
+TEST_CASE_TEMPLATE("lambda init and transform", MatType, Matrix<int>, DistMatrix<int>) {
+    MatType A(3, 4);
     A = [](int i, int j) {
         return i * i * j * j * j;
     };
+    blacs::barrier();
     SUBCASE("init") {
         REQUIRE(A(1, 2) == 8);
         REQUIRE(A(2, 1) == 4);
@@ -57,33 +63,47 @@ TEST_CASE("lambda init and transform") {
         A = [](int x, int i, int j) {
             return x + i + j;
         };
+        blacs::barrier();
+//        if (blacs::mpirank==0) A.print();
         REQUIRE(A(1, 2) == 11);
         REQUIRE(A(2, 1) == 7);
         REQUIRE(A(2, 2) == 36);
     }
 }
 
-TEST_CASE("arithmetic and boolean") {
-    Matrix<int> A(2, 3);
+TEST_CASE_TEMPLATE("arithmetic and boolean", MatType, Matrix<int>, DistMatrix<int>) {
+    MatType A(3, 2);
+
     A = 2;
+
+    blacs::barrier();
     REQUIRE((A == 2));
+
     SUBCASE("rescale and add") {
         A *= 5;
+        blacs::barrier();
         REQUIRE((A == 10));
         A += 3;
+        blacs::barrier();
         REQUIRE((A == 13));
     }
+
     SUBCASE("equality between matrices, sum") {
         A = {1, 2, 3, 1, 2, 3};
-        Matrix<bool> expected(2, 3);
-        Matrix<bool> result(2, 3);
+        blacs::barrier();
+
+        MatType expected(3, 2);
+        MatType result(3, 2);
         result = [&A](int i, int j) { return A(i, j) == 2; };
         expected = {false, true, false, false, true, false};
+
+        blacs::barrier();
         REQUIRE((result == expected));
         REQUIRE(A.sum() == 12);
     }
+
     SUBCASE("matrix addition") {
-        Matrix<int> B(2, 3);
+        MatType B(3, 2);
         A = {1, 2, 3, 1, 2, 3};
         B = {3, 2, 1, 3, 2, 1};
         A += B;

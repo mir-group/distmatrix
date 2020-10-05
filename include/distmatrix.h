@@ -21,7 +21,15 @@ public:
     MPI_Datatype mpitype;
 
     void fence() override;
-    void barrier() override;
+    bool islocal(int i, int j);
+
+    // assignment operator isn't inherited by default;
+    using Matrix<ValueType>::operator=;
+
+    bool operator==(const ValueType x) override;
+    bool operator==(const Matrix<ValueType> &x) override;
+
+    ValueType sum() override;
 
 protected:
     std::pair<int, int> unflatten_local(int idx);
@@ -30,7 +38,6 @@ protected:
     std::pair<int, int> g2l(int i, int j);
     std::pair<int, int> g2p(int i, int j);
     int flatten(int i, int j) override;
-    bool islocal(int i, int j);
     std::pair<int, int> getlocalsizes(int ip, int jp);
 };
 

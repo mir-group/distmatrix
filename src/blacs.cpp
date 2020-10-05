@@ -37,3 +37,7 @@ void blacs::finalize(int finalize_mpi) {
     int cont = !finalize_mpi;
     blacs_exit_(&cont);
 }
+
+void blacs::barrier() {
+    MPI_Barrier(MPI_COMM_WORLD);
+}

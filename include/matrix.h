@@ -39,14 +39,13 @@ public:
             ComplexValueType;
     std::pair<std::vector<ComplexValueType>, Matrix<ComplexValueType>> diagonalize();
 
-    bool operator==(const ValueType x);
-    bool operator==(const Matrix<ValueType> &x);
+    virtual bool operator==(const ValueType x);
+    virtual bool operator==(const Matrix<ValueType> &x);
 
 
-    ValueType sum();
+    virtual ValueType sum();
     void print();
     virtual void fence(){;};
-    virtual void barrier(){;};
 
 protected:
     virtual int flatten(int i, int j);

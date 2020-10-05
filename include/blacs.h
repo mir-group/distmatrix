@@ -14,6 +14,8 @@ public:
     inline static const char blacslayout = 'R';
     inline static int nprows, npcols, mpisize, mpirank, blacscontext;
     inline static int myprow, mypcol;
+
+    static void barrier();
 };
 
 
