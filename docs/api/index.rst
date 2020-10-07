@@ -5,7 +5,7 @@ API
 
 .. toctree::
     :maxdepth: 1
-    :glob:
-
-    *
+   blacs
+   matrix
+   distmatrix
 
