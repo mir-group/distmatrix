@@ -30,6 +30,9 @@ public:
     void operator+=(const ValueType x);
     void operator+=(const Matrix<ValueType> &A);
 
+    /**
+        Matrix product
+    */
     Matrix<ValueType> matmul(const Matrix<ValueType> &B, const ValueType alpha = ValueType(1));
 
     typedef typename std::conditional_t<
