@@ -31,6 +31,8 @@ public:
 
     ValueType sum() override;
 
+    DistMatrix<ValueType> matmul(const DistMatrix<ValueType> &B, const ValueType alpha = ValueType(1));
+
 protected:
     std::pair<int, int> unflatten_local(int idx);
     std::pair<int, int> unflatten(int idx) override;

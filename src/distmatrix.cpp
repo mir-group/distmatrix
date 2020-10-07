@@ -1,9 +1,9 @@
 
+#include <blacs.h>
 #include <distmatrix.h>
 #include <extern_blacs.h>
 #include <iostream>
 #include <mpi.h>
-#include <blacs.h>
 
 void delete_window(MPI_Win *window) {
     MPI_Win_free(window);
@@ -144,7 +144,7 @@ std::pair<int, int> DistMatrix<ValueType>::getlocalsizes(int ip, int jp) {
 template<class ValueType>
 void DistMatrix<ValueType>::fence() {
     MPI_Win_fence(0, *mpiwindow);
-//    MPI_Win_flush_all(*mpiwindow);
+    //    MPI_Win_flush_all(*mpiwindow);
 }
 template<class ValueType>
 bool DistMatrix<ValueType>::operator==(const ValueType x) {
@@ -166,6 +166,39 @@ ValueType DistMatrix<ValueType>::sum() {
     ValueType result;
     MPI_Allreduce(&local_sum, &result, 1, mpitype, MPI_SUM, MPI_COMM_WORLD);
     return result;
+}
+template<class ValueType>
+DistMatrix<ValueType> DistMatrix<ValueType>::matmul(const DistMatrix<ValueType> &B, const ValueType alpha) {
+    int m = this->nrows, k = this->ncols, n = B.ncols;
+
+    DistMatrix<ValueType> C(m, n);
+    ValueType beta(0);
+    ValueType *A_ptr = this->array.get(), *B_ptr = B.array.get(), *C_ptr = C.array.get();
+    char trans = 'N';
+    int one = 1;
+    //    std::cout << "DISTMATRIX MATMUL\n";
+    if constexpr (std::is_same_v<ValueType, float>) {
+        psgemm_(&trans, &trans, &m, &n, &k, &alpha, A_ptr, &one, &one, &desc[0],
+                B_ptr, &one, &one, &(B.desc[0]), &beta,
+                C_ptr, &one, &one, &(C.desc[0]));
+    } else if constexpr (std::is_same_v<ValueType, double>) {
+        pdgemm_(&trans, &trans, &m, &n, &k, &alpha, A_ptr, &one, &one, &desc[0],
+                B_ptr, &one, &one, &(B.desc[0]), &beta,
+                C_ptr, &one, &one, &(C.desc[0]));
+
+    } else if constexpr (std::is_same_v<ValueType, std::complex<float>>) {
+        pcgemm_(&trans, &trans, &m, &n, &k, &alpha, A_ptr, &one, &one, &desc[0],
+                B_ptr, &one, &one, &(B.desc[0]), &beta,
+                C_ptr, &one, &one, &(C.desc[0]));
+
+    } else if constexpr (std::is_same_v<ValueType, std::complex<double>>) {
+        pzgemm_(&trans, &trans, &m, &n, &k, &alpha, A_ptr, &one, &one, &desc[0],
+                B_ptr, &one, &one, &(B.desc[0]), &beta,
+                C_ptr, &one, &one, &(C.desc[0]));
+    } else {
+        throw std::logic_error("matmul called with unsupported type");
+    }
+    return C;
 }
 
 

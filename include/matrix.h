@@ -45,7 +45,7 @@ public:
 
     virtual ValueType sum();
     void print();
-    virtual void fence(){;};
+    virtual void fence() { ; };
 
 protected:
     virtual int flatten(int i, int j);

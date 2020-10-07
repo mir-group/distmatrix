@@ -24,20 +24,30 @@ int indxg2l_(const int *, const int *, const int *, const int *, const int *);
 
 int indxl2g_(int *, int *, int *, int *, int *);
 
-void pdgemm_(const char *, const char *, int *, int *, const int *, double *,
+void psgemm_(const char *, const char *, int *, int *, int *, const float *,
+             float *, int *, int *, const int *, float *, int *, int *,
+             const int *, float *, float *, int *, int *, int *);
+void pdgemm_(const char *, const char *, int *, int *, int *, const double *,
              double *, int *, int *, const int *, double *, int *, int *,
              const int *, double *, double *, int *, int *, int *);
+void pcgemm_(const char *, const char *, int *, int *, const int *,
+             const std::complex<float> *, std::complex<float> *, int *, int *,
+             const int *, std::complex<float> *, int *, int *, const int *,
+             std::complex<float> *, std::complex<float> *, int *, int *,
+             int *);
+void pzgemm_(const char *, const char *, int *, int *, const int *,
+             const std::complex<double> *, std::complex<double> *, int *, int *,
+             const int *, std::complex<double> *, int *, int *, const int *,
+             std::complex<double> *, std::complex<double> *, int *, int *,
+             int *);
+
 void pdsyev_(char *, char *, int *, double *, int *, int *, int *, double *,
              double *, int *, int *, int *, double *, int *, int *);
 //void pzelset_(std::complex<double> *, int *, int *, int *,
 //              std::complex<double> *);
 //void pzelget_(char *, char *, std::complex<double> *, std::complex<double> *,
 //              int *, int *, int *);
-void pzgemm_(const char *, const char *, int *, int *, const int *,
-             std::complex<double> *, std::complex<double> *, int *, int *,
-             const int *, std::complex<double> *, int *, int *, const int *,
-             std::complex<double> *, std::complex<double> *, int *, int *,
-             int *);
+
 void pzheev_(char *, char *, int *, std::complex<double> *, int *, int *, int *,
              double *, std::complex<double> *, int *, int *, int *,
              std::complex<double> *, int *, std::complex<double> *, int *,

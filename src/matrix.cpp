@@ -73,7 +73,7 @@ template<class ValueType>
 void Matrix<ValueType>::operator=(std::initializer_list<ValueType> x) {
     for (int k = 0; k < nlocal; k++) {
         auto [i, j] = unflatten(k);
-        int idx = j*nrows+i;
+        int idx = j * nrows + i;
         set(i, j, *(x.begin() + idx));
     }
     std::cout << std::endl;

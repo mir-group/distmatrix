@@ -1,31 +1,36 @@
 #include <Eigen/Dense>
 #include <Eigen/Eigenvalues>
 #include <cmath>
+#include <distmatrix.h>
 #include <doctest.h>
 #include <iostream>
 #include <matrix.h>
+#include <mpi.h>
 #include <numeric>
 
 // TODO: Check a complex type too
-TEST_CASE("matrix multiplication") {
+TEST_CASE_TEMPLATE("matrix multiplication", MatType, Matrix<double>, DistMatrix<double>) {
     const int m = 7, k = 5, n = 6;
-    Matrix<double> A(m, k);
-    Matrix<double> B(k, n);
+    MatType A(m, k);
+    MatType B(k, n);
     Eigen::Matrix<double, m, k> Aeig = Eigen::Matrix<double, m, k>::Random();
     Eigen::Matrix<double, k, n> Beig = Eigen::Matrix<double, k, n>::Random();
+    // avoid random seeding issues
+    MPI_Bcast(Aeig.data(), m * k, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(Beig.data(), k * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     A = [&Aeig](int i, int j) {
         return Aeig(i, j);
     };
     B = [&Beig](int i, int j) {
         return Beig(i, j);
     };
-    auto C = A.matmul(B, 3);
+    MatType C = A.matmul(B, 3);
     auto Ceig = 3 * Aeig * Beig;
-    Matrix<bool> difference_is_small(m, n);
-    difference_is_small = [&C, &Ceig](int i, int j) {
-        return std::abs(C(i, j) - Ceig(i, j)) < 1e-12;
+    MatType difference(m, n);
+    difference = [&C, &Ceig](int i, int j) {
+        return std::abs(C(i, j) - Ceig(i, j));
     };
-    REQUIRE((difference_is_small==true));
+    REQUIRE(difference.sum() < 1e-12);
 }
 
 TEST_CASE("general eigensolver") {
