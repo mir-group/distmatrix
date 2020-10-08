@@ -16,8 +16,8 @@ int main(int argc, char **argv) {
     context.applyCommandLine(argc, argv);
 
     int res = context.run();// run
-    blacs::finalize(0);
-    MPI_Finalize();
+    blacs::finalize(1);
+//    MPI_Finalize();
 
     if (context.shouldExit())// important - query flags (and --exit) rely on the user doing this
         return res;          // propagate the result of the tests

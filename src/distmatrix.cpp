@@ -11,7 +11,7 @@ void delete_window(MPI_Win *window) {
 }
 
 template<class ValueType>
-DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperblock_, int ncolsperblock_) : nrowsperblock(nrowsperblock_), ncolsperblock(ncolsperblock_),
+DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperblock, int ncolsperblock) : nrowsperblock(nrowsperblock), ncolsperblock(ncolsperblock),
                                                                                                           Matrix<ValueType>(ndistrows, ndistcols), mpiwindow(new MPI_Win, delete_window) {
     if (blacs::nprows > ndistrows || blacs::npcols > ndistcols) {
         throw std::logic_error("process grid is larger than matrix - TODO");
@@ -141,11 +141,7 @@ std::pair<int, int> DistMatrix<ValueType>::getlocalsizes(int ip, int jp) {
     int nlocalcols = numroc_(&(this->ncols), &ncolsperblock, &jp, &zero, &blacs::npcols);
     return {nlocalrows, nlocalcols};
 }
-template<class ValueType>
-void DistMatrix<ValueType>::fence() {
-    MPI_Win_fence(0, *mpiwindow);
-    //    MPI_Win_flush_all(*mpiwindow);
-}
+
 template<class ValueType>
 bool DistMatrix<ValueType>::operator==(const ValueType x) {
     bool local_equal = Matrix<ValueType>::operator==(x);

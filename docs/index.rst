@@ -6,6 +6,8 @@
 Welcome to distmatrix's documentation!
 ======================================
 
+distmatrix is a simple, lightweight C++ library that wraps BLACS, ScaLAPACK and MPI-RMA in a user-friendly package which lets you seamlessly distribute matrices over multiple machines.
+
 Table of Contents
 ^^^^^^^^^^^^^^^^^
 .. toctree::

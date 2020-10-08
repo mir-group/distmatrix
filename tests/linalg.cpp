@@ -18,6 +18,7 @@ TEST_CASE_TEMPLATE("matrix multiplication", MatType, Matrix<double>, DistMatrix<
     // avoid random seeding issues
     MPI_Bcast(Aeig.data(), m * k, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     MPI_Bcast(Beig.data(), k * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
     A = [&Aeig](int i, int j) {
         return Aeig(i, j);
     };
@@ -28,7 +29,7 @@ TEST_CASE_TEMPLATE("matrix multiplication", MatType, Matrix<double>, DistMatrix<
     auto Ceig = 3 * Aeig * Beig;
     MatType difference(m, n);
     difference = [&C, &Ceig](int i, int j) {
-        return std::abs(C(i, j) - Ceig(i, j));
+        return std::norm(C(i, j) - Ceig(i, j));
     };
     REQUIRE(difference.sum() < 1e-12);
 }
