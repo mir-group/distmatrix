@@ -6,6 +6,7 @@
 #include <functional>
 #include <iostream>
 #include <numeric>
+#include <string>
 #include <type_traits>
 
 #ifdef USE_MKL
@@ -205,13 +206,70 @@ std::pair<std::vector<typename Matrix<ValueType>::ComplexValueType>, Matrix<type
             }
         }
     } else {
-        throw std::logic_error("this should only be called for complex<float/double>");
+        throw std::logic_error("diagonalize called with unsupported type!");
     }
     if (info) {
         std::cerr << "info = " << info << std::endl;
         throw std::runtime_error("error in LAPACKE_?geev");
     }
     return {eigvals, eigvecs};
+}
+template<class ValueType>
+Matrix<ValueType> Matrix<ValueType>::qr_invert() {
+    Matrix<ValueType> QR(nrows, ncols), Ainv(nrows, ncols);
+    copy_to(QR);
+    std::vector<ValueType> tau(nrows);
+    auto check_info = [](int info, std::string name) {
+        if (info) {
+            std::cerr << "info = " << info << std::endl;
+            throw std::runtime_error("error in " + name);
+        }
+    };
+
+    if constexpr (std::is_same_v<ValueType, float>) {
+        /*
+         * Upper triangular part of QR will contain R, lower triangular
+         * will be Q as represented by Householder reflections.
+         */
+        int info = LAPACKE_sgeqrf(LAPACK_COL_MAJOR, nrows, ncols, QR.array.get(), nrows, tau.data());
+        check_info(info, "geqrf");
+
+        QR.copy_to(Ainv);
+
+        /*
+         * Upper triangular part of Ainv will be the inverse of R.
+         */
+        info = LAPACKE_strtri(LAPACK_COL_MAJOR, 'U', 'N', nrows, Ainv.array.get(), nrows);
+        check_info(info, "trtri");
+
+        /*
+         * Set lower triangular part of Ainv to zero.
+         */
+        Ainv = [](ValueType Ainvij, int i, int j) {
+            return i > j ? 0 : Ainvij;
+        };
+
+        /*
+         * Calculate A^-1 = R^-1 Q^T
+         */
+        info = LAPACKE_sormqr(LAPACK_COL_MAJOR, 'R', 'T', nrows, ncols, nrows, QR.array.get(), nrows, tau.data(), Ainv.array.get(), nrows);
+        check_info(info, "ormqr");
+    } else if constexpr (std::is_same_v<ValueType, double>) {
+        int info = LAPACKE_dgeqrf(LAPACK_COL_MAJOR, nrows, ncols, QR.array.get(), nrows, tau.data());
+        check_info(info, "geqrf");
+        QR.copy_to(Ainv);
+        info = LAPACKE_dtrtri(LAPACK_COL_MAJOR, 'U', 'N', nrows, Ainv.array.get(), nrows);
+        check_info(info, "trtri");
+        Ainv = [](ValueType Ainvij, int i, int j) {
+            return i > j ? 0 : Ainvij;
+        };
+        info = LAPACKE_dormqr(LAPACK_COL_MAJOR, 'R', 'T', nrows, ncols, nrows, QR.array.get(), nrows, tau.data(), Ainv.array.get(), nrows);
+        check_info(info, "ormqr");
+    } else {
+        throw std::logic_error("qr_invert called with unsupported type!");
+    }
+
+    return Ainv;
 }
 
 

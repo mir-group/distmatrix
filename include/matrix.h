@@ -170,6 +170,8 @@ public:
      */
     void print();
 
+    Matrix<ValueType> qr_invert();
+
 protected:
     /**
      * Convert 2D-index to flattened index in the range `[0,nlocal)`.

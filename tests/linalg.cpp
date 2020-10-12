@@ -34,6 +34,23 @@ TEST_CASE_TEMPLATE("matrix multiplication", MatType, Matrix<double>, DistMatrix<
     REQUIRE(difference.sum() < 1e-12);
 }
 
+TEST_CASE_TEMPLATE("QR matrix inversion", MatType, Matrix<double>) {
+    const int n = 17;
+    MatType A(n,n);
+    Eigen::MatrixXd Aeig = Eigen::MatrixXd::Random(n, n);
+    A = [&Aeig](int i, int j) {
+      return Aeig(i, j);
+    };
+    MatType Ainv = A.qr_invert();
+    MatType I = A.matmul(Ainv);
+    MatType error(n,n);
+    error = [&I] (int i, int j){
+         return i==j ? std::abs(1 - I(i,j)) : std::norm(I(i,j));
+    };
+    std::cout << error.sum() << std::endl;
+    REQUIRE(error.sum() < 1e-12);
+}
+
 TEST_CASE("general eigensolver") {
     const int n = 7;
     Matrix<double> A(n, n);
