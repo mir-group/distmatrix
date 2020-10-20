@@ -64,7 +64,6 @@ TEST_CASE_TEMPLATE("lambda init and transform", MatType, Matrix<int>, DistMatrix
             return x + i + j;
         };
         blacs::barrier();
-        //        if (blacs::mpirank==0) A.print();
         REQUIRE(A(1, 2) == 11);
         REQUIRE(A(2, 1) == 7);
         REQUIRE(A(2, 2) == 36);
@@ -73,9 +72,7 @@ TEST_CASE_TEMPLATE("lambda init and transform", MatType, Matrix<int>, DistMatrix
 
 TEST_CASE_TEMPLATE("arithmetic and boolean", MatType, Matrix<int>, DistMatrix<int>) {
     MatType A(3, 2);
-
     A = 2;
-
     blacs::barrier();
     REQUIRE((A == 2));
 

@@ -54,7 +54,7 @@ DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperbloc
 
 template<class ValueType>
 ValueType DistMatrix<ValueType>::operator()(int i, int j, bool lock) {
-    if (false && islocal(i, j)) {
+    if (islocal(i, j)) {
         return Matrix<ValueType>::operator()(i, j);
     } else {
         int remoteidx = flatten(i, j);
@@ -78,7 +78,7 @@ ValueType DistMatrix<ValueType>::operator()(int i, int j, bool lock) {
 
 template<class ValueType>
 void DistMatrix<ValueType>::set(int i, int j, const ValueType x, bool lock) {
-    if (false && islocal(i, j)) {
+    if (islocal(i, j)) {
         Matrix<ValueType>::set(i, j, x);
     } else {
         int remoteidx = flatten(i, j); // something wrong with this, returns 0

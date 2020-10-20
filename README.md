@@ -28,7 +28,7 @@ assert(A(3,4) == 10);
 
 // set a matrix element, either local or remote
 if(blacs::mpirank == 0) A.set(1,2,-1);
-blacs::barrier();
+A.fence();
 
 // all ranks can now read that element
 assert(A(1,2)==-1);
