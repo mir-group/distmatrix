@@ -36,12 +36,12 @@ std::pair<int, int> Matrix<ValueType>::unflatten(int idx) {
 }
 
 template<class ValueType>
-void Matrix<ValueType>::set(int i, int j, const ValueType x) {
+void Matrix<ValueType>::set(int i, int j, const ValueType x, bool lock) {
     array[flatten(i, j)] = x;
 }
 
 template<class ValueType>
-ValueType Matrix<ValueType>::operator()(int i, int j) {
+ValueType Matrix<ValueType>::operator()(int i, int j, bool lock) {
     return array[flatten(i, j)];
 }
 

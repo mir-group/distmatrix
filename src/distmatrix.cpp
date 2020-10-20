@@ -6,19 +6,20 @@
 #include <mpi.h>
 
 void delete_window(MPI_Win *window) {
+    MPI_Win_fence(0, *window);
     MPI_Win_free(window);
     delete window;
 }
 
 template<class ValueType>
 DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperblock, int ncolsperblock) : nrowsperblock(nrowsperblock), ncolsperblock(ncolsperblock),
-                                                                                                          Matrix<ValueType>(ndistrows, ndistcols), mpiwindow(new MPI_Win, delete_window) {
+                                                                                                        Matrix<ValueType>(ndistrows, ndistcols), mpiwindow(new MPI_Win, delete_window) {
     if (blacs::nprows > ndistrows || blacs::npcols > ndistcols) {
         throw std::logic_error("process grid is larger than matrix - TODO");
     }
     if (nrowsperblock < 1 || ncolsperblock < 1) {
-        nrowsperblock = std::max(1, ndistrows / blacs::nprows);
-        ncolsperblock = std::max(1, ndistcols / blacs::npcols);
+        this->nrowsperblock = nrowsperblock = std::max(1, ndistrows / blacs::nprows);
+        this->ncolsperblock = ncolsperblock = std::max(1, ndistcols / blacs::npcols);
     }
     int zero = 0;
     int info;
@@ -32,6 +33,7 @@ DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperbloc
         throw std::runtime_error("DESCINIT error");
     }
     MPI_Win_create((this->array).get(), this->nlocal * sizeof(ValueType), sizeof(ValueType), MPI_INFO_NULL, MPI_COMM_WORLD, mpiwindow.get());
+    fence();
 
     if (std::is_same_v<ValueType, bool>) {
         mpitype = MPI_CXX_BOOL;
@@ -51,33 +53,44 @@ DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperbloc
 }
 
 template<class ValueType>
-ValueType DistMatrix<ValueType>::operator()(int i, int j) {
-    if (islocal(i, j)) {
+ValueType DistMatrix<ValueType>::operator()(int i, int j, bool lock) {
+    if (false && islocal(i, j)) {
         return Matrix<ValueType>::operator()(i, j);
     } else {
         int remoteidx = flatten(i, j);
         auto [ip, jp] = g2p(i, j);
         int remoterank = ip * blacs::npcols + jp;
         ValueType result;
-        MPI_Win_lock(MPI_LOCK_SHARED, remoterank, 0, *mpiwindow);
-        MPI_Get(&result, 1, mpitype, remoterank, remoteidx, 1, mpitype, *mpiwindow);
-        MPI_Win_unlock(remoterank, *mpiwindow);
+        if (lock){
+            MPI_Win_lock(MPI_LOCK_SHARED, remoterank, 0, *mpiwindow);
+            MPI_Get(&result, 1, mpitype, remoterank, remoteidx, 1, mpitype, *mpiwindow);
+            MPI_Win_unlock(remoterank, *mpiwindow);
+        }
+        else{
+            MPI_Request request;
+            MPI_Rget(&result, 1, mpitype, remoterank, remoteidx, 1, mpitype, *mpiwindow, &request);
+            MPI_Wait(&request, MPI_STATUS_IGNORE);
+        }
+
         return result;
     }
 }
 
 template<class ValueType>
-void DistMatrix<ValueType>::set(int i, int j, const ValueType x) {
-    if (islocal(i, j)) {
+void DistMatrix<ValueType>::set(int i, int j, const ValueType x, bool lock) {
+    if (false && islocal(i, j)) {
         Matrix<ValueType>::set(i, j, x);
     } else {
-        int remoteidx = flatten(i, j);
+        int remoteidx = flatten(i, j); // something wrong with this, returns 0
         auto [ip, jp] = g2p(i, j);
         int remoterank = ip * blacs::npcols + jp;
-        auto [rr, rc] = getlocalsizes(ip, jp);
-        MPI_Win_lock(MPI_LOCK_EXCLUSIVE, remoterank, 0, *mpiwindow);
+        if(remoterank < 0){
+            printf(" i = %d, j = %d, mb = %d, nb = %d, ip = %d, jp = %d, npcols = %d, nprows = %d, rr = %d\n",
+                   i,j, nrowsperblock, ncolsperblock, ip, jp, blacs::npcols, blacs::nprows, remoterank);
+        }
+        if (lock) MPI_Win_lock(MPI_LOCK_EXCLUSIVE, remoterank, 0, *mpiwindow);
         MPI_Put(&x, 1, mpitype, remoterank, remoteidx, 1, mpitype, *mpiwindow);
-        MPI_Win_unlock(remoterank, *mpiwindow);
+        if (lock) MPI_Win_unlock(remoterank, *mpiwindow);
     }
 }
 
@@ -195,6 +208,11 @@ DistMatrix<ValueType> DistMatrix<ValueType>::matmul(const DistMatrix<ValueType> 
         throw std::logic_error("matmul called with unsupported type");
     }
     return C;
+}
+template<class ValueType>
+void DistMatrix<ValueType>::fence() {
+    MPI_Win_fence(0, *mpiwindow);
+    blacs::barrier();
 }
 
 

@@ -34,15 +34,16 @@ public:
      * @param j The column index.
      * @return `A(i,j)`.
      */
-    virtual ValueType operator()(int i, int j);
+    virtual ValueType operator()(int i, int j, bool lock = false);
 
     /**
      * Set an element of the matrix.
      * @param i The row index.
      * @param j The column index.
      * @param x The value to be set.
+     * @param lock Ignored for serial matrix.
      */
-    virtual void set(int i, int j, const ValueType x);
+    virtual void set(int i, int j, const ValueType x, bool lock = false);
 
     /**
      *  \brief Perform a deep copy to the matrix `A`
@@ -50,6 +51,7 @@ public:
      *  Note: The usual assignment operator has reference semantics,
      *  so `A = B` makes `A` point to the underlying data of `B`.
      * @param A The destination matrix.
+     * @param lock Ignored for serial matrix.
      */
     void copy_to(Matrix<ValueType> &A);
 
@@ -170,7 +172,15 @@ public:
      */
     void print();
 
+    /**
+     * Matrix inversion, using QR factorization for extra stability.
+     *
+     * *Note:* Only supported for `float` and `double`, as it uses `?ormqr`.
+     * @return The inverse matrix.
+     */
     Matrix<ValueType> qr_invert();
+
+    virtual void fence(){;};
 
 protected:
     /**

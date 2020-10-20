@@ -9,42 +9,42 @@ TEST_CASE_TEMPLATE("assignment and copy", MatType, Matrix<int>, DistMatrix<int>)
     MatType A(3, 4);
     MatType B = A;
     int rank = blacs::mpirank;
-    //    A.fence();
     int should_set = rank == 0 || std::is_same_v<MatType, Matrix<int>>;
-    if (should_set) A.set(1, 2, 3);
 
-    blacs::barrier();
+    if (should_set) A.set(2, 1, 3);
+    A.fence();
 
     SUBCASE("assignment with reference semantics") {
         REQUIRE(A.nrows == 3);
         REQUIRE(A.ncols == 4);
-        REQUIRE(A(1, 2) == 3);
+        REQUIRE(A(2, 1) == 3);
         REQUIRE(B.ncols == 4);
         REQUIRE(B.nrows == 3);
-        REQUIRE(B(1, 2) == 3);
+        REQUIRE(B(2, 1) == 3);
         if constexpr (std::is_same_v<MatType, DistMatrix<int>>) {
             REQUIRE(A.nlocalrows == B.nlocalrows);
             REQUIRE(A.nlocalcols == B.nlocalcols);
             REQUIRE(A.nlocal == B.nlocal);
         }
     }
-    SUBCASE("copy constructor with reference semantics") {
+    blacs::barrier();
+        SUBCASE("copy constructor with reference semantics") {
         MatType C(A);
         REQUIRE(C.ncols == 4);
         REQUIRE(C.nrows == 3);
-        REQUIRE(C(1, 2) == 3);
+        REQUIRE(C(2, 1) == 3);
         if (should_set) A.set(0, 0, 4);
-        blacs::barrier();
+        A.fence();
         REQUIRE(C(0, 0) == 4);
     }
     SUBCASE("explicit deep copy") {
         MatType C(3, 4);
         A.copy_to(C);
-        blacs::barrier();
-        if (should_set) A.set(1, 2, 7);
+        C.fence();
+        if (should_set) A.set(2, 1, 7);
         REQUIRE(C.ncols == 4);
         REQUIRE(C.nrows == 3);
-        REQUIRE(C(1, 2) == 3);
+        REQUIRE(C(2, 1) == 3);
     }
 }
 
@@ -64,7 +64,7 @@ TEST_CASE_TEMPLATE("lambda init and transform", MatType, Matrix<int>, DistMatrix
             return x + i + j;
         };
         blacs::barrier();
-//        if (blacs::mpirank==0) A.print();
+        //        if (blacs::mpirank==0) A.print();
         REQUIRE(A(1, 2) == 11);
         REQUIRE(A(2, 1) == 7);
         REQUIRE(A(2, 2) == 36);

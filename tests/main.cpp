@@ -9,9 +9,9 @@ int main(int argc, char **argv) {
     blacs::initialize();
     doctest::Context context;
 
-    if (blacs::mpirank != 0){
+    /*if (blacs::mpirank != 0){
         context.setOption("out","/dev/null");
-    }
+    }*/
 
     context.applyCommandLine(argc, argv);
 

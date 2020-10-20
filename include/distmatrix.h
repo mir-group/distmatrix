@@ -38,7 +38,7 @@ public:
      * @param j The column index.
      * @return A(i,j), whether local or remote.
      */
-    ValueType operator()(int i, int j) override;
+    ValueType operator()(int i, int j, bool lock = false) override;
 
     /**
      * Set an element of the matrix.
@@ -47,7 +47,7 @@ public:
      * @param j The column index.
      * @param x The new value of A(i,j).
      */
-    void set(int i, int j, ValueType x) override;
+    void set(int i, int j, ValueType x, bool lock = false) override;
 
     /**
      * The MPI_Datatype, e.g. `MPI_CXX_BOOL`, `MPI_DOUBLE`, `MPI_COMPLEX_FLOAT`.
@@ -94,7 +94,9 @@ public:
      */
     DistMatrix<ValueType> matmul(const DistMatrix<ValueType> &B, const ValueType alpha = ValueType(1));
 
-protected:
+    void fence();
+
+//protected:
     /**
      * Convert flat local index to local row and column index.
      * @param idx Flat index in the range `[0,nlocal)`.
