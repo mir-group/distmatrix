@@ -3,12 +3,12 @@ project(distmatrix C CXX Fortran)
 
 set(CMAKE_CXX_STANDARD 17)
 
-include_directories(include)
 
 add_library(distmatrix src/matrix.cpp include/matrix.h src/distmatrix.cpp include/distmatrix.h src/blacs.cpp include/blacs.h)
 
 include(external/CMakeLists.txt)
 
+target_include_directories(distmatrix PUBLIC include)
 target_include_directories(distmatrix PUBLIC external)
 target_link_libraries(distmatrix PUBLIC ${LAPACK_LIBRARIES})
 
