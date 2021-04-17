@@ -87,16 +87,31 @@ public:
     ValueType sum() override;
 
     /**
-     * Matrix product, `C = alpha*A*B`.
+     * Matrix product, `C = alpha*op(A)*op(B)`.
      * @param B The matrix with which to multiply.
      * @param alpha The scalar prefactor. Defaults to 1.
+     * @param transA Following standard LAPACK convention, 'N', 'T' or 'C'.
+     * @param transB Following standard LAPACK convention, 'N', 'T' or 'C'.
      * @return The matrix `C`.
      */
-    DistMatrix<ValueType> matmul(const DistMatrix<ValueType> &B, const ValueType alpha = ValueType(1));
+    DistMatrix<ValueType> matmul(const DistMatrix<ValueType> &B, const ValueType alpha = ValueType(1), const char transA = 'N', const char transB = 'N');
+
+    /**
+     * Compute the inverse using a QR factorization. WARNING: May require square process grid.
+     * @return The inverse matrix.
+     */
+    DistMatrix<ValueType> qr_invert();
+
+    /**
+     * Cholesky decomposition, A = LL^T or A = U^TU.
+     * @param uplo Whether to find upper or lower triangular matrix. Either 'L' or 'U'.
+     * @return The Cholesky factor L or U.
+     */
+    DistMatrix<ValueType> cholesky(const char uplo = 'L');
 
     void fence();
 
-//protected:
+    //protected:
     /**
      * Convert flat local index to local row and column index.
      * @param idx Flat index in the range `[0,nlocal)`.

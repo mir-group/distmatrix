@@ -9,12 +9,12 @@
 #include <numeric>
 
 // TODO: Check a complex type too
-TEST_CASE_TEMPLATE("matrix multiplication", MatType, Matrix<double>, DistMatrix<double>) {
+TEST_CASE_TEMPLATE("matrix multiplication", MatType, DistMatrix<double>) {
     const int m = 7, k = 5, n = 6;
     MatType A(m, k);
-    MatType B(k, n);
+    MatType B(n, k);
     Eigen::Matrix<double, m, k> Aeig = Eigen::Matrix<double, m, k>::Random();
-    Eigen::Matrix<double, k, n> Beig = Eigen::Matrix<double, k, n>::Random();
+    Eigen::Matrix<double, n, k> Beig = Eigen::Matrix<double, n, k>::Random();
     // avoid random seeding issues
     MPI_Bcast(Aeig.data(), m * k, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     MPI_Bcast(Beig.data(), k * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -25,8 +25,8 @@ TEST_CASE_TEMPLATE("matrix multiplication", MatType, Matrix<double>, DistMatrix<
     B = [&Beig](int i, int j) {
         return Beig(i, j);
     };
-    MatType C = A.matmul(B, 3);
-    auto Ceig = 3 * Aeig * Beig;
+    MatType C = A.matmul(B, 3, 'N', 'T');
+    auto Ceig = 3 * Aeig * Beig.transpose();
     MatType difference(m, n);
     difference = [&C, &Ceig](int i, int j) {
         return std::norm(C(i, j) - Ceig(i, j));
@@ -34,10 +34,11 @@ TEST_CASE_TEMPLATE("matrix multiplication", MatType, Matrix<double>, DistMatrix<
     REQUIRE(difference.sum() < 1e-12);
 }
 
-TEST_CASE_TEMPLATE("QR matrix inversion", MatType, Matrix<double>) {
+TEST_CASE_TEMPLATE("QR matrix inversion", MatType, DistMatrix<double>) {
     const int n = 17;
     MatType A(n, n);
     Eigen::MatrixXd Aeig = Eigen::MatrixXd::Random(n, n);
+    MPI_Bcast(Aeig.data(), n * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     A = [&Aeig](int i, int j) {
         return Aeig(i, j);
     };
@@ -46,6 +47,25 @@ TEST_CASE_TEMPLATE("QR matrix inversion", MatType, Matrix<double>) {
     MatType error(n, n);
     error = [&I](int i, int j) {
         return i == j ? std::abs(1 - I(i, j)) : std::norm(I(i, j));
+    };
+    // std::cout << error.sum() << std::endl;
+    REQUIRE(error.sum() < 1e-12);
+}
+
+TEST_CASE_TEMPLATE("Cholesky decomposition", MatType, DistMatrix<double>) {
+    const int n = 17;
+    MatType A(n, n);
+    Eigen::MatrixXd Aeig = Eigen::MatrixXd::Random(n, n);
+    MPI_Bcast(Aeig.data(), n * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    // symmetric, positive definite matrix
+    A = [&Aeig](int i, int j) {
+        return Aeig(i, j) + Aeig(j, i) + (i == j ? n : 0);
+    };
+    MatType L = A.cholesky();
+    MatType LLT = L.matmul(L, 1.0, 'N', 'T');
+    MatType error(n, n);
+    error = [&LLT, &A](int i, int j) {
+        return std::norm(A(i, j) - LLT(i, j));
     };
     // std::cout << error.sum() << std::endl;
     REQUIRE(error.sum() < 1e-12);

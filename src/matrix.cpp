@@ -214,7 +214,7 @@ std::pair<std::vector<typename Matrix<ValueType>::ComplexValueType>, Matrix<type
     }
     return {eigvals, eigvecs};
 }
-template<class ValueType>
+/*template<class ValueType>
 Matrix<ValueType> Matrix<ValueType>::qr_invert() {
     Matrix<ValueType> QR(nrows, ncols), Ainv(nrows, ncols);
     copy_to(QR);
@@ -227,31 +227,31 @@ Matrix<ValueType> Matrix<ValueType>::qr_invert() {
     };
 
     if constexpr (std::is_same_v<ValueType, float>) {
-        /*
+        *//*
          * Upper triangular part of QR will contain R, lower triangular
          * will be Q as represented by Householder reflections.
-         */
+         *//*
         int info = LAPACKE_sgeqrf(LAPACK_COL_MAJOR, nrows, ncols, QR.array.get(), nrows, tau.data());
         check_info(info, "geqrf");
 
         QR.copy_to(Ainv);
 
-        /*
+        *//*
          * Upper triangular part of Ainv will be the inverse of R.
-         */
+         *//*
         info = LAPACKE_strtri(LAPACK_COL_MAJOR, 'U', 'N', nrows, Ainv.array.get(), nrows);
         check_info(info, "trtri");
 
-        /*
+        *//*
          * Set lower triangular part of Ainv to zero.
-         */
+         *//*
         Ainv = [](ValueType Ainvij, int i, int j) {
             return i > j ? 0 : Ainvij;
         };
 
-        /*
+        *//*
          * Calculate A^-1 = R^-1 Q^T
-         */
+         *//*
         info = LAPACKE_sormqr(LAPACK_COL_MAJOR, 'R', 'T', nrows, ncols, nrows, QR.array.get(), nrows, tau.data(), Ainv.array.get(), nrows);
         check_info(info, "ormqr");
     } else if constexpr (std::is_same_v<ValueType, double>) {
@@ -270,7 +270,7 @@ Matrix<ValueType> Matrix<ValueType>::qr_invert() {
     }
 
     return Ainv;
-}
+}*/
 
 
 template class Matrix<bool>;

@@ -4,7 +4,7 @@
 
 extern "C" {
 void blacs_get_(int *, int *, int *);
-void blacs_exit_(int*);
+void blacs_exit_(int *);
 void blacs_pinfo_(int *, int *);
 void blacs_gridinit_(int *, char *, int *, int *);
 void blacs_gridinfo_(int *, int *, int *, int *, int *);
@@ -40,6 +40,18 @@ void pzgemm_(const char *, const char *, int *, int *, const int *,
              const int *, std::complex<double> *, int *, int *, const int *,
              std::complex<double> *, std::complex<double> *, int *, int *,
              int *);
+
+void psgeqrf_(int *m, int *n, float *a, int *ia, int *ja, int *desca, float *tau, float *work, int *lwork, int *info);
+void pstrtri_(char *uplo, char *diag, int *n, float *a, int *ia, int *ja, int *desca, int *info);
+void psormqr_(char *side, char *trans, int *m, int *n, int *k, float *a, int *ia, int *ja, int *desca, float *tau, float *c, int *ic, int *jc, int *descc, float *work, int *lwork, int *info);
+void pdgeqrf_(int *m, int *n, double *a, int *ia, int *ja, int *desca, double *tau, double *work, int *lwork, int *info);
+void pdtrtri_(char *uplo, char *diag, int *n, double *a, int *ia, int *ja, int *desca, int *info);
+void pdormqr_(char *side, char *trans, int *m, int *n, int *k, double *a, int *ia, int *ja, int *desca, double *tau, double *c, int *ic, int *jc, int *descc, double *work, int *lwork, int *info);
+
+void pspotrf_(const char *uplo , int *n , float *a , int *ia , int *ja , int *desca , int *info );
+void pdpotrf_(const char *uplo , int *n , double *a , int *ia , int *ja , int *desca , int *info );
+void pcpotrf_(const char *uplo , int *n , std::complex<float> *a , int *ia , int *ja , int *desca , int *info );
+void pzpotrf_(const char *uplo , int *n , std::complex<double> *a , int *ia , int *ja , int *desca , int *info );
 
 void pdsyev_(char *, char *, int *, double *, int *, int *, int *, double *,
              double *, int *, int *, int *, double *, int *, int *);

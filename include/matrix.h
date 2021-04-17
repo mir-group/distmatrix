@@ -172,13 +172,13 @@ public:
      */
     void print();
 
-    /**
+    /*virtual *//**
      * Matrix inversion, using QR factorization for extra stability.
      *
      * *Note:* Only supported for `float` and `double`, as it uses `?ormqr`.
      * @return The inverse matrix.
-     */
-    Matrix<ValueType> qr_invert();
+     *//*
+    Matrix<ValueType> qr_invert();*/
 
     virtual void fence(){;};
 

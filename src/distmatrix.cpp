@@ -1,9 +1,17 @@
 
 #include <blacs.h>
 #include <distmatrix.h>
+#include <exception>
 #include <extern_blacs.h>
 #include <iostream>
 #include <mpi.h>
+
+void check_info(int info, const std::string &name) {
+    if (info) {
+        std::cerr << "info = " << info << std::endl;
+        throw std::runtime_error("error in " + name);
+    }
+};
 
 void delete_window(MPI_Win *window) {
     MPI_Win_fence(0, *window);
@@ -18,15 +26,18 @@ DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperbloc
         throw std::logic_error("process grid is larger than matrix - TODO");
     }
     if (nrowsperblock < 1 || ncolsperblock < 1) {
-        this->nrowsperblock = nrowsperblock = std::max(1, ndistrows / blacs::nprows);
-        this->ncolsperblock = ncolsperblock = std::max(1, ndistcols / blacs::npcols);
+        this->nrowsperblock = nrowsperblock = std::max(1, ndistrows / blacs::nprows / 4);
+        this->ncolsperblock = ncolsperblock = std::max(1, ndistcols / blacs::npcols / 4);
     }
+
     int zero = 0;
     int info;
     std::tie(this->nlocalrows, this->nlocalcols) = getlocalsizes(blacs::myprow, blacs::mypcol);
 
     this->nlocal = (this->nlocalrows) * (this->nlocalcols);
     this->array = std::shared_ptr<ValueType[]>(new ValueType[this->nlocal]);
+    //printf("ip = %d, jp = %d, ndistrows = %d, ndistcols = %d, nlocalrows = %d\n",
+    //     blacs::myprow, blacs::mypcol, ndistrows, ndistcols, this->nlocalrows);
     descinit_(&desc[0], &ndistrows, &ndistcols, &nrowsperblock, &ncolsperblock, &zero, &zero, &blacs::blacscontext, &this->nlocalrows, &info);
     if (info != 0) {
         std::cerr << "info = " << info << std::endl;
@@ -61,12 +72,11 @@ ValueType DistMatrix<ValueType>::operator()(int i, int j, bool lock) {
         auto [ip, jp] = g2p(i, j);
         int remoterank = ip * blacs::npcols + jp;
         ValueType result;
-        if (lock){
+        if (lock) {
             MPI_Win_lock(MPI_LOCK_SHARED, remoterank, 0, *mpiwindow);
             MPI_Get(&result, 1, mpitype, remoterank, remoteidx, 1, mpitype, *mpiwindow);
             MPI_Win_unlock(remoterank, *mpiwindow);
-        }
-        else{
+        } else {
             MPI_Request request;
             MPI_Rget(&result, 1, mpitype, remoterank, remoteidx, 1, mpitype, *mpiwindow, &request);
             MPI_Wait(&request, MPI_STATUS_IGNORE);
@@ -81,12 +91,12 @@ void DistMatrix<ValueType>::set(int i, int j, const ValueType x, bool lock) {
     if (islocal(i, j)) {
         Matrix<ValueType>::set(i, j, x);
     } else {
-        int remoteidx = flatten(i, j); // something wrong with this, returns 0
+        int remoteidx = flatten(i, j);// something wrong with this, returns 0
         auto [ip, jp] = g2p(i, j);
         int remoterank = ip * blacs::npcols + jp;
-        if(remoterank < 0){
+        if (remoterank < 0) {
             printf(" i = %d, j = %d, mb = %d, nb = %d, ip = %d, jp = %d, npcols = %d, nprows = %d, rr = %d\n",
-                   i,j, nrowsperblock, ncolsperblock, ip, jp, blacs::npcols, blacs::nprows, remoterank);
+                   i, j, nrowsperblock, ncolsperblock, ip, jp, blacs::npcols, blacs::nprows, remoterank);
         }
         if (lock) MPI_Win_lock(MPI_LOCK_EXCLUSIVE, remoterank, 0, *mpiwindow);
         MPI_Put(&x, 1, mpitype, remoterank, remoteidx, 1, mpitype, *mpiwindow);
@@ -152,6 +162,8 @@ std::pair<int, int> DistMatrix<ValueType>::getlocalsizes(int ip, int jp) {
     int zero = 0;
     int nlocalrows = numroc_(&(this->nrows), &nrowsperblock, &ip, &zero, &blacs::nprows);
     int nlocalcols = numroc_(&(this->ncols), &ncolsperblock, &jp, &zero, &blacs::npcols);
+    //printf("ip = %d, jp = %d, nrows = %d, ncols = %d, nrowsperblock = %d, ncolsperblock = %d, nprows = %d, npcols = %d, nlocalrows = %d, nlocalcols = %d\n",
+    //     ip, jp, this->nrows, this->ncols, nrowsperblock, ncolsperblock, blacs::nprows, blacs::npcols, nlocalrows, nlocalcols);
     return {nlocalrows, nlocalcols};
 }
 
@@ -177,31 +189,48 @@ ValueType DistMatrix<ValueType>::sum() {
     return result;
 }
 template<class ValueType>
-DistMatrix<ValueType> DistMatrix<ValueType>::matmul(const DistMatrix<ValueType> &B, const ValueType alpha) {
-    int m = this->nrows, k = this->ncols, n = B.ncols;
+DistMatrix<ValueType> DistMatrix<ValueType>::matmul(const DistMatrix<ValueType> &B, const ValueType alpha, const char transA, const char transB) {
+    int m, k, n;
+    int Crowsperblock, Ccolsperblock;
+    if (transA == 'N' or transA == 'n') {
+        m = this->nrows;
+        k = this->ncols;
+        Crowsperblock = this->nrowsperblock;
+    } else {
+        m = this->ncols;
+        k = this->nrows;
+        Crowsperblock = this->ncolsperblock;
+    }
+    if (transB == 'N' or transB == 'n') {
+        n = B.ncols;
+        Ccolsperblock = B.ncolsperblock;
+    } else {
+        n = B.nrows;
+        Ccolsperblock = B.nrowsperblock;
+    }
 
-    DistMatrix<ValueType> C(m, n);
+
+    DistMatrix<ValueType> C(m, n, Crowsperblock, Ccolsperblock);
     ValueType beta(0);
     ValueType *A_ptr = this->array.get(), *B_ptr = B.array.get(), *C_ptr = C.array.get();
-    char trans = 'N';
     int one = 1;
     //    std::cout << "DISTMATRIX MATMUL\n";
     if constexpr (std::is_same_v<ValueType, float>) {
-        psgemm_(&trans, &trans, &m, &n, &k, &alpha, A_ptr, &one, &one, &desc[0],
+        psgemm_(&transA, &transB, &m, &n, &k, &alpha, A_ptr, &one, &one, &desc[0],
                 B_ptr, &one, &one, &(B.desc[0]), &beta,
                 C_ptr, &one, &one, &(C.desc[0]));
     } else if constexpr (std::is_same_v<ValueType, double>) {
-        pdgemm_(&trans, &trans, &m, &n, &k, &alpha, A_ptr, &one, &one, &desc[0],
+        pdgemm_(&transA, &transB, &m, &n, &k, &alpha, A_ptr, &one, &one, &desc[0],
                 B_ptr, &one, &one, &(B.desc[0]), &beta,
                 C_ptr, &one, &one, &(C.desc[0]));
 
     } else if constexpr (std::is_same_v<ValueType, std::complex<float>>) {
-        pcgemm_(&trans, &trans, &m, &n, &k, &alpha, A_ptr, &one, &one, &desc[0],
+        pcgemm_(&transA, &transB, &m, &n, &k, &alpha, A_ptr, &one, &one, &desc[0],
                 B_ptr, &one, &one, &(B.desc[0]), &beta,
                 C_ptr, &one, &one, &(C.desc[0]));
 
     } else if constexpr (std::is_same_v<ValueType, std::complex<double>>) {
-        pzgemm_(&trans, &trans, &m, &n, &k, &alpha, A_ptr, &one, &one, &desc[0],
+        pzgemm_(&transA, &transB, &m, &n, &k, &alpha, A_ptr, &one, &one, &desc[0],
                 B_ptr, &one, &one, &(B.desc[0]), &beta,
                 C_ptr, &one, &one, &(C.desc[0]));
     } else {
@@ -213,6 +242,121 @@ template<class ValueType>
 void DistMatrix<ValueType>::fence() {
     MPI_Win_fence(0, *mpiwindow);
     blacs::barrier();
+}
+template<class ValueType>
+DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
+    if (this->nrows != this->ncols) {
+        throw std::runtime_error("Trying to invert non-quadratic matrix!");
+    }
+    // TODO: Fix rows/columns, blocks
+    blacs::barrier();
+    printf("creating QR\n");
+    DistMatrix<ValueType> QR(this->nrows, this->ncols, this->nrowsperblock, this->ncolsperblock);
+    blacs::barrier();
+    printf("creating Ainv\n");
+    blacs::barrier();
+    //DistMatrix<ValueType> Ainv(this->nrows, this->ncols, this->nrowsperblock, this->ncolsperblock);
+    DistMatrix<ValueType> Ainv(this->ncols, this->nrows, this->ncolsperblock, this->nrowsperblock);
+    blacs::barrier();
+    this->copy_to(QR);
+    std::vector<ValueType> tau(this->nlocalrows);
+
+    int info, lwork = -1, one = 1;
+    ValueType worktmp;
+    int m = this->nrows, n = this->ncols;
+    char U = 'U', N = 'N', R = 'R', T = 'T';
+
+    if constexpr (std::is_same_v<ValueType, float>) {
+        /*
+         * Upper triangular part of QR will contain R, lower triangular
+         * will be Q as represented by Householder reflections.
+         */
+        psgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), &worktmp, &lwork, &info);
+        check_info(info, "geqrf work query");
+        lwork = worktmp;
+        std::vector<ValueType> work(lwork);
+        psgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), work.data(), &lwork, &info);
+        check_info(info, "geqrf");
+        QR.copy_to(Ainv);//TODO: Fix when blocks don't align
+
+        /*
+         * Upper triangular part of Ainv will be the inverse of R.
+         */
+        pstrtri_(&U, &N, &m, Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &info);
+        check_info(info, "trtri");
+
+        /*
+         * Set lower triangular part of Ainv to zero.
+         */
+        Ainv = [](ValueType Ainvij, int i, int j) {
+            return i > j ? 0 : Ainvij;
+        };
+
+        /*
+         * Calculate A^-1 = R^-1 Q^T
+         */
+        lwork = -1;
+        psormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &worktmp, &lwork, &info);
+        check_info(info, "ormqr work query");
+        lwork = worktmp;
+        work.resize(lwork);
+        psormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), work.data(), &lwork, &info);
+        check_info(info, "ormqr");
+    } else if constexpr (std::is_same_v<ValueType, double>) {
+        pdgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), &worktmp, &lwork, &info);
+        check_info(info, "geqrf work query");
+        lwork = worktmp;
+        std::vector<ValueType> work(lwork);
+        pdgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), work.data(), &lwork, &info);
+        check_info(info, "geqrf");
+        QR.copy_to(Ainv);
+
+
+        pdtrtri_(&U, &N, &m, Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &info);
+        check_info(info, "trtri");
+
+        Ainv = [](ValueType Ainvij, int i, int j) {
+            return i > j ? 0 : Ainvij;
+        };
+
+        lwork = -1;
+        pdormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &worktmp, &lwork, &info);
+        check_info(info, "ormqr work query");
+        lwork = worktmp;
+        work.resize(lwork);
+        pdormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), work.data(), &lwork, &info);
+        check_info(info, "ormqr");
+    } else {
+        throw std::logic_error("qr_invert called with unsupported type!");
+    }
+
+    return Ainv;
+}
+template<class ValueType>
+DistMatrix<ValueType> DistMatrix<ValueType>::cholesky(const char uplo) {
+    DistMatrix<ValueType> LU(this->nrows, this->ncols, this->nrowsperblock, this->ncolsperblock);
+    this->copy_to(LU);
+    int info;
+    int one = 1;
+    if constexpr (std::is_same_v<ValueType, float>) {
+        pspotrf_(&uplo, &(LU.nrows), LU.array.get(), &one, &one, &(LU.desc[0]), &info);
+    } else if constexpr (std::is_same_v<ValueType, double>) {
+        pdpotrf_(&uplo, &(LU.nrows), LU.array.get(), &one, &one, &(LU.desc[0]), &info);
+    } else if constexpr (std::is_same_v<ValueType, std::complex<float>>) {
+        pcpotrf_(&uplo, &(LU.nrows), LU.array.get(), &one, &one, &(LU.desc[0]), &info);
+    } else if constexpr (std::is_same_v<ValueType, std::complex<double>>) {
+        pzpotrf_(&uplo, &(LU.nrows), LU.array.get(), &one, &one, &(LU.desc[0]), &info);
+    } else {
+        throw std::logic_error("cholesky called with unsupported type!");
+    }
+    check_info(info, "potrf");
+    LU = [&uplo](ValueType LUij, int i, int j){
+        if((uplo=='U' && j>=i) || (uplo=='L' && i>=j)){
+            return LUij;
+        }
+        return ValueType(0);
+    };
+    return LU;
 }
 
 
