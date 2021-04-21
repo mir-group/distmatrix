@@ -25,8 +25,10 @@ DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperbloc
     if (blacs::nprows > ndistrows || blacs::npcols > ndistcols) {
         throw std::logic_error("process grid is larger than matrix - TODO");
     }
-    if (nrowsperblock < 1 || ncolsperblock < 1) {
+    if (nrowsperblock < 1) {
         this->nrowsperblock = nrowsperblock = std::max(1, ndistrows / blacs::nprows / 4);
+    }
+    if (ncolsperblock < 1) {
         this->ncolsperblock = ncolsperblock = std::max(1, ndistcols / blacs::npcols / 4);
     }
 
