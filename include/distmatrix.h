@@ -109,6 +109,14 @@ public:
      */
     DistMatrix<ValueType> cholesky(const char uplo = 'L');
 
+    /**
+     * Invert the matrix, assuming it is triangular.
+     * @param uplo 'L' if lower triangular, 'U' if upper triangular.
+     * @param unit_triangular 'N' if non-unit triangular, 'U' if unit triangular.
+     * @return The inverse matrix.
+     */
+    DistMatrix<ValueType> triangular_invert(const char uplo = 'L', const char unit_triangular='N');
+
     void fence();
 
     //protected:

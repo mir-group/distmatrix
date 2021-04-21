@@ -358,6 +358,27 @@ DistMatrix<ValueType> DistMatrix<ValueType>::cholesky(const char uplo) {
     };
     return LU;
 }
+template<class ValueType>
+DistMatrix<ValueType> DistMatrix<ValueType>::triangular_invert(const char uplo, const char unit_triangular) {
+    DistMatrix<ValueType> LUinv(this->nrows, this->ncols, this->nrowsperblock, this->ncolsperblock);
+    this->copy_to(LUinv);
+    int info;
+    int one = 1;
+    if constexpr (std::is_same_v<ValueType, float>) {
+        pstrtri_(&uplo, &unit_triangular, &(LUinv.nrows), LUinv.array.get(), &one, &one, &(LUinv.desc[0]), &info);
+    } else if constexpr (std::is_same_v<ValueType, double>) {
+        pdtrtri_(&uplo, &unit_triangular, &(LUinv.nrows), LUinv.array.get(), &one, &one, &(LUinv.desc[0]), &info);
+    } else if constexpr (std::is_same_v<ValueType, std::complex<float>>) {
+        pctrtri_(&uplo, &unit_triangular, &(LUinv.nrows), LUinv.array.get(), &one, &one, &(LUinv.desc[0]), &info);
+    } else if constexpr (std::is_same_v<ValueType, std::complex<double>>) {
+        pztrtri_(&uplo, &unit_triangular, &(LUinv.nrows), LUinv.array.get(), &one, &one, &(LUinv.desc[0]), &info);
+    } else {
+        throw std::logic_error("triangular_invert called with unsupported type!");
+    }
+    check_info(info, "potrf");
+
+    return LUinv;
+}
 
 
 template class DistMatrix<bool>;

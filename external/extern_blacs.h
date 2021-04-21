@@ -42,11 +42,14 @@ void pzgemm_(const char *, const char *, int *, int *, const int *,
              int *);
 
 void psgeqrf_(int *m, int *n, float *a, int *ia, int *ja, int *desca, float *tau, float *work, int *lwork, int *info);
-void pstrtri_(char *uplo, char *diag, int *n, float *a, int *ia, int *ja, int *desca, int *info);
+void pstrtri_(const char *uplo, const char *diag, int *n, float *a, int *ia, int *ja, int *desca, int *info);
 void psormqr_(char *side, char *trans, int *m, int *n, int *k, float *a, int *ia, int *ja, int *desca, float *tau, float *c, int *ic, int *jc, int *descc, float *work, int *lwork, int *info);
 void pdgeqrf_(int *m, int *n, double *a, int *ia, int *ja, int *desca, double *tau, double *work, int *lwork, int *info);
-void pdtrtri_(char *uplo, char *diag, int *n, double *a, int *ia, int *ja, int *desca, int *info);
+void pdtrtri_(const char *uplo, const char *diag, int *n, double *a, int *ia, int *ja, int *desca, int *info);
 void pdormqr_(char *side, char *trans, int *m, int *n, int *k, double *a, int *ia, int *ja, int *desca, double *tau, double *c, int *ic, int *jc, int *descc, double *work, int *lwork, int *info);
+
+void pctrtri_(const char *uplo, const char *diag, int *n, std::complex<float> *a, int *ia, int *ja, int *desca, int *info);
+void pztrtri_(const char *uplo, const char *diag, int *n, std::complex<double> *a, int *ia, int *ja, int *desca, int *info);
 
 void pspotrf_(const char *uplo , int *n , float *a , int *ia , int *ja , int *desca , int *info );
 void pdpotrf_(const char *uplo , int *n , double *a , int *ia , int *ja , int *desca , int *info );

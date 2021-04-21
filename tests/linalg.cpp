@@ -52,7 +52,7 @@ TEST_CASE_TEMPLATE("QR matrix inversion", MatType, DistMatrix<double>) {
     REQUIRE(error.sum() < 1e-12);
 }
 
-TEST_CASE_TEMPLATE("Cholesky decomposition", MatType, DistMatrix<double>) {
+TEST_CASE_TEMPLATE("Cholesky decomposition and triangular inversion", MatType, DistMatrix<double>) {
     const int n = 17;
     MatType A(n, n);
     Eigen::MatrixXd Aeig = Eigen::MatrixXd::Random(n, n);
@@ -62,14 +62,27 @@ TEST_CASE_TEMPLATE("Cholesky decomposition", MatType, DistMatrix<double>) {
         return Aeig(i, j) + Aeig(j, i) + (i == j ? n : 0);
     };
     MatType L = A.cholesky();
-    MatType LLT = L.matmul(L, 1.0, 'N', 'T');
-    MatType error(n, n);
-    error = [&LLT, &A](int i, int j) {
-        return std::norm(A(i, j) - LLT(i, j));
-    };
-    // std::cout << error.sum() << std::endl;
-    REQUIRE(error.sum() < 1e-12);
+    SUBCASE("Cholesky decomposition") {
+        MatType LLT = L.matmul(L, 1.0, 'N', 'T');
+        MatType error(n, n);
+        error = [&LLT, &A](int i, int j) {
+            return std::norm(A(i, j) - LLT(i, j));
+        };
+        // std::cout << error.sum() << std::endl;
+        REQUIRE(error.sum() < 1e-12);
+    }
+    SUBCASE("Triangular inversion") {
+        MatType Linv = L.triangular_invert('L');
+        auto I = L.matmul(Linv);
+        MatType error(n, n);
+        error = [&I](int i, int j) {
+            return i == j ? std::abs(1 - I(i, j)) : std::norm(I(i, j));
+        };
+        // std::cout << error.sum() << std::endl;
+        REQUIRE(error.sum() < 1e-12);
+    }
 }
+
 
 TEST_CASE("general eigensolver") {
     const int n = 7;
