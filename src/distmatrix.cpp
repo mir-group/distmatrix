@@ -247,18 +247,17 @@ void DistMatrix<ValueType>::fence() {
 }
 template<class ValueType>
 DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
-    if (this->nrows != this->ncols) {
-        throw std::runtime_error("Trying to invert non-quadratic matrix!");
+    if (this->nrows < this->ncols) {
+        throw std::runtime_error("The matrix for QR should have nrows >= ncols !");
     }
-    // TODO: Fix rows/columns, blocks
+
     blacs::barrier();
     printf("creating QR\n");
     DistMatrix<ValueType> QR(this->nrows, this->ncols, this->nrowsperblock, this->ncolsperblock);
     blacs::barrier();
     printf("creating Ainv\n");
     blacs::barrier();
-    //DistMatrix<ValueType> Ainv(this->nrows, this->ncols, this->nrowsperblock, this->ncolsperblock);
-    DistMatrix<ValueType> Ainv(this->ncols, this->nrows, this->ncolsperblock, this->nrowsperblock);
+    DistMatrix<ValueType> Ainv(this->nrows, this->ncols, this->nrowsperblock, this->ncolsperblock);
     blacs::barrier();
     this->copy_to(QR);
     std::vector<ValueType> tau(this->nlocalrows);
@@ -279,7 +278,7 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
         std::vector<ValueType> work(lwork);
         psgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), work.data(), &lwork, &info);
         check_info(info, "geqrf");
-        QR.copy_to(Ainv);//TODO: Fix when blocks don't align
+        QR.copy_to(Ainv);
 
         /*
          * Upper triangular part of Ainv will be the inverse of R.

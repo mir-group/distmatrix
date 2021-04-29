@@ -35,16 +35,17 @@ TEST_CASE_TEMPLATE("matrix multiplication", MatType, DistMatrix<double>) {
 }
 
 TEST_CASE_TEMPLATE("QR matrix inversion", MatType, DistMatrix<double>) {
-    const int n = 17;
+    const int m = 17;
+    const int n = 7;
     MatType A(n, n);
-    Eigen::MatrixXd Aeig = Eigen::MatrixXd::Random(n, n);
-    MPI_Bcast(Aeig.data(), n * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    Eigen::MatrixXd Aeig = Eigen::MatrixXd::Random(m, n);
+    MPI_Bcast(Aeig.data(), m * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     A = [&Aeig](int i, int j) {
         return Aeig(i, j);
     };
     MatType Ainv = A.qr_invert();
-    MatType I = A.matmul(Ainv);
-    MatType error(n, n);
+    MatType I = A.matmul(Ainv, 1.0, 'T', 'T');
+    MatType error(n, n); // TODO: need to be nxn matrix
     error = [&I](int i, int j) {
         return i == j ? std::abs(1 - I(i, j)) : std::norm(I(i, j));
     };
