@@ -53,6 +53,7 @@ TEST_CASE_TEMPLATE("QR matrix inversion", MatType, DistMatrix<double>) {
     };
     // std::cout << error.sum() << std::endl;
     REQUIRE(error.sum() < 1e-12);
+    std::cout << "Passed test qr_invert" << std::endl;
 }
 
 TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
@@ -65,6 +66,7 @@ TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
     A = [&Aeig](int i, int j) {
         return Aeig(i, j);
     };
+    std::cout << "Created A" << std::endl; 
 
     MatType b(m, 1);
     Eigen::VectorXd beig = Eigen::VectorXd::Random(m);
@@ -72,6 +74,7 @@ TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
     b = [&beig](int i, int j) {
         return beig(i);
     };
+    std::cout << "Created b" << std::endl; 
 
     MatType QR(m, n);
     std::vector<double> tau;

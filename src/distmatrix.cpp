@@ -345,6 +345,7 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
     blacs::barrier();
     DistMatrix<ValueType> Ainv(this->nrows, this->ncols, this->nrowsperblock, this->ncolsperblock);
     blacs::barrier();
+    printf("copying A to QR\n");
     this->copy_to(QR);
     std::vector<ValueType> tau(this->nlocalrows);
 
