@@ -391,6 +391,7 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
         psormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), work.data(), &lwork, &info);
         check_info(info, "ormqr");
     } else if constexpr (std::is_same_v<ValueType, double>) {
+        printf("begin pdgeqrf\n");
         pdgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), &worktmp, &lwork, &info);
         check_info(info, "geqrf work query");
         lwork = worktmp;
@@ -398,6 +399,7 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
         pdgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), work.data(), &lwork, &info);
         check_info(info, "geqrf");
         QR.copy_to(Ainv);
+        printf("Done pdgeqrf\n");
 
         pdtrtri_(&U, &N, &n, Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &info);
         check_info(info, "trtri");
@@ -409,14 +411,16 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
         Ainv = [](ValueType Ainvij, int i, int j) {
             return i > j ? 0 : Ainvij;
         };
+        printf("set lower tri of A\n");
 
-        lwork = -1;
-        pdormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &worktmp, &lwork, &info);
-        check_info(info, "ormqr work query");
-        lwork = worktmp;
-        work.resize(lwork);
-        pdormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), work.data(), &lwork, &info);
-        check_info(info, "ormqr");
+//        lwork = -1;
+//        pdormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &worktmp, &lwork, &info);
+//        check_info(info, "ormqr work query");
+//        lwork = worktmp;
+//        work.resize(lwork);
+//        pdormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), work.data(), &lwork, &info);
+//        check_info(info, "ormqr");
+//        printf("Done pdormqr\n");
     } else {
         throw std::logic_error("qr_invert called with unsupported type!");
     }
