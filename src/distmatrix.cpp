@@ -473,7 +473,7 @@ DistMatrix<ValueType> DistMatrix<ValueType>::triangular_invert(const char uplo, 
     } else {
         throw std::logic_error("triangular_invert called with unsupported type!");
     }
-    check_info(info, "potrf");
+    check_info(info, "trtri");
 
     return LUinv;
 }
