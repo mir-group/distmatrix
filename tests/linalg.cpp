@@ -10,7 +10,8 @@
 
 // TODO: Check a complex type too
 TEST_CASE_TEMPLATE("matrix multiplication", MatType, DistMatrix<double>) {
-    const int m = 7, k = 5, n = 6;
+    //const int m = 7, k = 5, n = 6;
+    const int m = 17, k = 15, n = 16;
     MatType A(m, k);
     MatType B(n, k);
     Eigen::Matrix<double, m, k> Aeig = Eigen::Matrix<double, m, k>::Random();
@@ -34,30 +35,30 @@ TEST_CASE_TEMPLATE("matrix multiplication", MatType, DistMatrix<double>) {
     REQUIRE(difference.sum() < 1e-12);
 }
 
-TEST_CASE_TEMPLATE("QR matrix inversion", MatType, DistMatrix<double>) {
-    // if the matrix is too small, like m = n = 7, the "mpirun -n 4" reports error
-    const int m = 17;
-    const int n = 17;
-
-    MatType A(m, n);
-    Eigen::MatrixXd Aeig = Eigen::MatrixXd::Random(m, n);
-    MPI_Bcast(Aeig.data(), m * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    A = [&Aeig](int i, int j) {
-        return Aeig(i, j);
-    };
-
-    MatType Ainv = A.qr_invert();
-    std::cout << "Done qr_invert in test" << std::endl;
-    MatType I = A.matmul(Ainv); //, 1.0, 'T', 'T');
-    std::cout << "Done A matmul A_inv" << std::endl;
-    MatType error(n, n); // TODO: need to be nxn matrix
-    error = [&I](int i, int j) {
-        return i == j ? std::abs(1 - I(i, j)) : std::norm(I(i, j));
-    };
-    // std::cout << error.sum() << std::endl;
-    REQUIRE(error.sum() < 1e-12);
-    std::cout << "Passed test qr_invert" << std::endl;
-}
+//TEST_CASE_TEMPLATE("QR matrix inversion", MatType, DistMatrix<double>) {
+//    // if the matrix is too small, like m = n = 7, the "mpirun -n 4" reports error
+//    const int m = 17;
+//    const int n = 17;
+//
+//    MatType A(m, n);
+//    Eigen::MatrixXd Aeig = Eigen::MatrixXd::Random(m, n);
+//    MPI_Bcast(Aeig.data(), m * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+//    A = [&Aeig](int i, int j) {
+//        return Aeig(i, j);
+//    };
+//
+//    MatType Ainv = A.qr_invert();
+//    std::cout << "Done qr_invert in test" << std::endl;
+//    MatType I = A.matmul(Ainv); //, 1.0, 'T', 'T');
+//    std::cout << "Done A matmul A_inv" << std::endl;
+//    MatType error(n, n); // TODO: need to be nxn matrix
+//    error = [&I](int i, int j) {
+//        return i == j ? std::abs(1 - I(i, j)) : std::norm(I(i, j));
+//    };
+//    // std::cout << error.sum() << std::endl;
+//    REQUIRE(error.sum() < 1e-12);
+//    std::cout << "Passed test qr_invert" << std::endl;
+//}
 
 TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
     const int m = 289;
