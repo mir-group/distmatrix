@@ -11,7 +11,7 @@
 // TODO: Check a complex type too
 TEST_CASE_TEMPLATE("matrix multiplication", MatType, DistMatrix<double>) {
     //const int m = 7, k = 5, n = 6;
-    const int m = 17, k = 15, n = 16;
+    const int m = 61, k = 59, n = 47;
     MatType A(m, k);
     MatType B(n, k);
     Eigen::Matrix<double, m, k> Aeig = Eigen::Matrix<double, m, k>::Random();
@@ -35,34 +35,9 @@ TEST_CASE_TEMPLATE("matrix multiplication", MatType, DistMatrix<double>) {
     REQUIRE(difference.sum() < 1e-12);
 }
 
-//TEST_CASE_TEMPLATE("QR matrix inversion", MatType, DistMatrix<double>) {
-//    // if the matrix is too small, like m = n = 7, the "mpirun -n 4" reports error
-//    const int m = 17;
-//    const int n = 17;
-//
-//    MatType A(m, n);
-//    Eigen::MatrixXd Aeig = Eigen::MatrixXd::Random(m, n);
-//    MPI_Bcast(Aeig.data(), m * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-//    A = [&Aeig](int i, int j) {
-//        return Aeig(i, j);
-//    };
-//
-//    MatType Ainv = A.qr_invert();
-//    std::cout << "Done qr_invert in test" << std::endl;
-//    MatType I = A.matmul(Ainv); //, 1.0, 'T', 'T');
-//    std::cout << "Done A matmul A_inv" << std::endl;
-//    MatType error(n, n); // TODO: need to be nxn matrix
-//    error = [&I](int i, int j) {
-//        return i == j ? std::abs(1 - I(i, j)) : std::norm(I(i, j));
-//    };
-//    // std::cout << error.sum() << std::endl;
-//    REQUIRE(error.sum() < 1e-12);
-//    std::cout << "Passed test qr_invert" << std::endl;
-//}
-
 TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
     const int m = 289;
-    const int n = 17;
+    const int n = 47;
 
     MatType A(m, n);
     Eigen::MatrixXd Aeig = Eigen::MatrixXd::Random(m, n);
@@ -87,7 +62,7 @@ TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
     std::vector<double> tau;
     std::tie(QR, tau) = A.qr();
     MatType R(n, n);
-    R = [&QR](int i, int j) {return i > j ? 0 : QR(i, j);};
+    R = [&QR](int i, int j) {return i > j ? 0 : QR(i, j, true);};
     MatType Rinv = R.triangular_invert('U');
     MatType Q_b = QR.QT_matmul(b, tau);
     std::cout << "Q_b size " << Q_b.nrows << " " << Q_b.ncols << std::endl;
@@ -112,7 +87,7 @@ TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
     double error = 0.0;
     for (int i = 0; i < n; i++) {
       for (int j = 0; j < n; j++) {
-        error += std::abs(Rinv(i, j) - R_inv_eig(i, j));
+        error += std::abs(Rinv(i, j, true) - R_inv_eig(i, j));
       }
     }
     std::cout << "Rinv error " << error << std::endl;
@@ -120,7 +95,7 @@ TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
  
     error = 0.0;
     for (int i = 0; i < n; i++) {
-      error += std::abs(Q_b(i, 0) - Q_beig(i));
+      error += std::abs(Q_b(i, 0, true) - Q_beig(i));
     }
     std::cout << "Q_b error " << error << std::endl;
     REQUIRE(error < 1e-12);
@@ -129,14 +104,14 @@ TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
     std::cout << "alpha compare" << std::endl;
     error = 0.0;
     for (int i = 0; i < n; i++) {
-      error += std::abs(alpha(i, 0) - alpha_eig(i));
+      error += std::abs(alpha(i, 0, true) - alpha_eig(i));
     }
     std::cout << "alpha error " << error << std::endl;
     REQUIRE(error < 1e-10);
 }
 
 TEST_CASE_TEMPLATE("Cholesky decomposition and triangular inversion", MatType, DistMatrix<double>) {
-    const int n = 17;
+    const int n = 61;
     MatType A(n, n);
     Eigen::MatrixXd Aeig = Eigen::MatrixXd::Random(n, n);
     MPI_Bcast(Aeig.data(), n * n, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -149,7 +124,7 @@ TEST_CASE_TEMPLATE("Cholesky decomposition and triangular inversion", MatType, D
         MatType LLT = L.matmul(L, 1.0, 'N', 'T');
         MatType error(n, n);
         error = [&LLT, &A](int i, int j) {
-            return std::norm(A(i, j) - LLT(i, j));
+            return std::norm(A(i, j, true) - LLT(i, j, true));
         };
         // std::cout << error.sum() << std::endl;
         REQUIRE(error.sum() < 1e-12);
@@ -159,53 +134,12 @@ TEST_CASE_TEMPLATE("Cholesky decomposition and triangular inversion", MatType, D
         auto I = L.matmul(Linv);
         MatType error(n, n);
         error = [&I](int i, int j) {
-            return i == j ? std::abs(1 - I(i, j)) : std::norm(I(i, j));
+            return i == j ? std::abs(1 - I(i, j, true)) : std::norm(I(i, j, true));
         };
         // std::cout << error.sum() << std::endl;
         REQUIRE(error.sum() < 1e-12);
     }
+    std::cout << "Cholesky matches" << std::endl; 
+
 }
 
-
-TEST_CASE("general eigensolver") {
-    const int n = 7;
-    Matrix<double> A(n, n);
-    Eigen::MatrixXd Aeig = Eigen::MatrixXd::Random(n, n);
-    A = [&Aeig](int i, int j) {
-        return Aeig(i, j);
-    };
-
-    auto [eigvals, eigvecs] = A.diagonalize();
-    Eigen::EigenSolver<decltype(Aeig)> es(Aeig);
-    auto eig_eigvals = es.eigenvalues();
-    auto eig_eigvecs = es.eigenvectors();
-
-    std::vector<double> diffs(n);
-    SUBCASE("eigenvalues") {
-        // compare with Eigen, with reordering
-        double error_eigvals = 0.0;
-        for (int i = 0; i < n; i++) {
-            std::complex<double> l = eig_eigvals[i];
-            std::transform(eigvals.begin(), eigvals.end(), diffs.begin(), [l](auto x) {
-                return std::norm(x - l);
-            });
-            int i_mapped = std::distance(diffs.begin(), std::min_element(diffs.begin(), diffs.end()));
-            error_eigvals += std::abs(diffs[i_mapped]);
-        }
-        REQUIRE(error_eigvals < 1e-15);
-    }
-    SUBCASE("eigenvectors") {
-        double error_eigvecs = 0.0;
-        for (int j = 0; j < n; j++) {
-            std::complex<double> l = eigvals[j];
-            for (int i = 0; i < n; i++) {
-                std::complex<double> Avij(0.0);
-                for (int k = 0; k < n; k++) {
-                    Avij += A(i, k) * eigvecs(k, j);
-                }
-                error_eigvecs += std::norm(Avij - l * eigvecs(i, j));
-            }
-        }
-        REQUIRE(error_eigvecs < 1e-12);
-    }
-}

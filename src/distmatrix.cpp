@@ -23,9 +23,9 @@ void delete_window(MPI_Win *window) {
 template<class ValueType>
 DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperblock, int ncolsperblock) : nrowsperblock(nrowsperblock), ncolsperblock(ncolsperblock),
                                                                                                         Matrix<ValueType>(ndistrows, ndistcols), mpiwindow(new MPI_Win, delete_window) {
-    if (blacs::nprows > ndistrows || blacs::npcols > ndistcols) {
-        throw std::logic_error("process grid is larger than matrix - TODO");
-    }
+//    if (blacs::nprows > ndistrows || blacs::npcols > ndistcols) {
+//        throw std::logic_error("process grid is larger than matrix - TODO");
+//    }
     if (nrowsperblock < 1) {
         this->nrowsperblock = nrowsperblock = std::max(1, ndistrows / blacs::nprows / 4);
     }
@@ -247,11 +247,97 @@ void DistMatrix<ValueType>::fence() {
     blacs::barrier();
 }
 template<class ValueType>
+std::tuple<DistMatrix<ValueType>, std::vector<ValueType>> DistMatrix<ValueType>::qr() {
+    /*
+     * Upper triangular part of QR will contain R, lower triangular
+     * will be Q as represented by Householder reflections.
+     */
+
+    if (this->nrows < this->ncols) {
+        throw std::runtime_error("The matrix for QR should have nrows >= ncols !");
+    }
+
+    blacs::barrier();
+    printf("creating QR\n");
+    DistMatrix<ValueType> QR(this->nrows, this->ncols, this->nrowsperblock, this->ncolsperblock);
+    blacs::barrier();
+    printf("barrier\n");
+    this->copy_to(QR);
+    printf("copied\n");
+    std::vector<ValueType> tau(this->nlocalrows);
+
+    int info, lwork = -1, one = 1;
+    ValueType worktmp;
+    int m = this->nrows, n = this->ncols;
+    char U = 'U', N = 'N', R = 'R', T = 'T';
+
+    if constexpr (std::is_same_v<ValueType, float>) {
+        psgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), &worktmp, &lwork, &info);
+        check_info(info, "geqrf work query");
+        lwork = worktmp;
+        std::vector<ValueType> work(lwork);
+        psgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), work.data(), &lwork, &info);
+        check_info(info, "geqrf");
+    } else if constexpr (std::is_same_v<ValueType, double>) {
+        pdgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), &worktmp, &lwork, &info);
+        check_info(info, "geqrf work query");
+        lwork = worktmp;
+        std::vector<ValueType> work(lwork);
+        pdgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), work.data(), &lwork, &info);
+        check_info(info, "geqrf");
+    } else {
+        throw std::logic_error("qr called with unsupported type!");
+    }
+
+    return std::make_tuple(QR, tau);
+}
+template<class ValueType>
+DistMatrix<ValueType> DistMatrix<ValueType>::QT_matmul(DistMatrix<ValueType> &b, std::vector<ValueType> &tau) {
+    /*
+     * Calculate Q_b = Q^T * b, TODO: generalize it to LRNT
+     */
+    int m = this->nrows, n = b.ncols;
+    int k = this->ncols;
+
+    DistMatrix<ValueType> Q_b(m, n, this->nrowsperblock, b.ncolsperblock);
+    blacs::barrier();
+    printf("creating Q_b\n");
+    b.copy_to(Q_b);
+
+    int info, lwork = -1, one = 1;
+    ValueType worktmp;
+    char U = 'U', N = 'N', L = 'L', R = 'R', T = 'T';
+
+    if constexpr (std::is_same_v<ValueType, float>) {
+        lwork = -1;
+        psormqr_(&L, &T, &m, &n, &k, (this->array).get(), &one, &one, &(this->desc[0]), tau.data(), Q_b.array.get(), &one, &one, &(Q_b.desc[0]), &worktmp, &lwork, &info);
+        check_info(info, "ormqr work query");
+        lwork = worktmp;
+        std::vector<ValueType> work(lwork);
+        work.resize(lwork);
+        psormqr_(&L, &T, &m, &n, &k, (this->array).get(), &one, &one, &(this->desc[0]), tau.data(), Q_b.array.get(), &one, &one, &(Q_b.desc[0]), work.data(), &lwork, &info);
+        check_info(info, "ormqr");
+    } else if constexpr (std::is_same_v<ValueType, double>) {
+        lwork = -1;
+        pdormqr_(&L, &T, &m, &n, &k, (this->array).get(), &one, &one, &(this->desc[0]), tau.data(), Q_b.array.get(), &one, &one, &(Q_b.desc[0]), &worktmp, &lwork, &info);
+        check_info(info, "ormqr work query");
+        lwork = worktmp;
+        std::vector<ValueType> work(lwork);
+        work.resize(lwork);
+        pdormqr_(&L, &T, &m, &n, &k, (this->array).get(), &one, &one, &(this->desc[0]), tau.data(), Q_b.array.get(), &one, &one, &(Q_b.desc[0]), work.data(), &lwork, &info);
+        check_info(info, "ormqr");
+    } else {
+        throw std::logic_error("QT_matmul called with unsupported type!");
+    }
+
+    return Q_b;
+}
+template<class ValueType>
 DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
     if (this->nrows != this->ncols) {
-        throw std::runtime_error("Trying to invert non-quadratic matrix!");
+        throw std::runtime_error("The matrix for QR should have nrows == ncols !");
     }
-    // TODO: Fix rows/columns, blocks
+
     blacs::barrier();
     printf("creating QR\n");
     DistMatrix<ValueType> QR(this->nrows, this->ncols, this->nrowsperblock, this->ncolsperblock);
@@ -261,6 +347,7 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
     //DistMatrix<ValueType> Ainv(this->nrows, this->ncols, this->nrowsperblock, this->ncolsperblock);
     DistMatrix<ValueType> Ainv(this->ncols, this->nrows, this->ncolsperblock, this->nrowsperblock);
     blacs::barrier();
+    printf("copying A to QR\n");
     this->copy_to(QR);
     std::vector<ValueType> tau(this->nlocalrows);
 
@@ -280,11 +367,12 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
         std::vector<ValueType> work(lwork);
         psgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), work.data(), &lwork, &info);
         check_info(info, "geqrf");
-        QR.copy_to(Ainv);//TODO: Fix when blocks don't align
+        QR.copy_to(Ainv);
 
         /*
          * Upper triangular part of Ainv will be the inverse of R.
          */
+        //pstrtri_(&U, &N, &n, Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &info);
         pstrtri_(&U, &N, &m, Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &info);
         check_info(info, "trtri");
 
@@ -306,6 +394,7 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
         psormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), work.data(), &lwork, &info);
         check_info(info, "ormqr");
     } else if constexpr (std::is_same_v<ValueType, double>) {
+        printf("begin pdgeqrf\n");
         pdgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), &worktmp, &lwork, &info);
         check_info(info, "geqrf work query");
         lwork = worktmp;
@@ -313,14 +402,20 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
         pdgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), work.data(), &lwork, &info);
         check_info(info, "geqrf");
         QR.copy_to(Ainv);
+        printf("Done pdgeqrf\n");
 
-
+        //pdtrtri_(&U, &N, &n, Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &info);
         pdtrtri_(&U, &N, &m, Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &info);
         check_info(info, "trtri");
+        printf("Done invert tri\n");
 
+        /*
+         * Set lower triangular part of Ainv to zero.
+         */
         Ainv = [](ValueType Ainvij, int i, int j) {
             return i > j ? 0 : Ainvij;
         };
+        printf("set lower tri of A\n");
 
         lwork = -1;
         pdormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &worktmp, &lwork, &info);
@@ -329,6 +424,7 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
         work.resize(lwork);
         pdormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), work.data(), &lwork, &info);
         check_info(info, "ormqr");
+        printf("Done pdormqr\n");
     } else {
         throw std::logic_error("qr_invert called with unsupported type!");
     }
@@ -378,7 +474,7 @@ DistMatrix<ValueType> DistMatrix<ValueType>::triangular_invert(const char uplo, 
     } else {
         throw std::logic_error("triangular_invert called with unsupported type!");
     }
-    check_info(info, "potrf");
+    check_info(info, "trtri");
 
     return LUinv;
 }

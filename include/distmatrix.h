@@ -96,6 +96,9 @@ public:
      */
     DistMatrix<ValueType> matmul(const DistMatrix<ValueType> &B, const ValueType alpha = ValueType(1), const char transA = 'N', const char transB = 'N');
 
+    std::tuple<DistMatrix<ValueType>, std::vector<ValueType>> qr();
+    DistMatrix<ValueType> QT_matmul(DistMatrix<ValueType> &b, std::vector<ValueType> &tau);
+
     /**
      * Compute the inverse using a QR factorization. WARNING: May require square process grid.
      * @return The inverse matrix.
