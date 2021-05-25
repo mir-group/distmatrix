@@ -28,7 +28,7 @@ TEST_CASE_TEMPLATE("assignment and copy", MatType, Matrix<int>, DistMatrix<int>)
         }
     }
     blacs::barrier();
-        SUBCASE("copy constructor with reference semantics") {
+    SUBCASE("copy constructor with reference semantics") {
         MatType C(A);
         REQUIRE(C.ncols == 4);
         REQUIRE(C.nrows == 3);
@@ -105,5 +105,32 @@ TEST_CASE_TEMPLATE("arithmetic and boolean", MatType, Matrix<int>, DistMatrix<in
         B = {3, 2, 1, 3, 2, 1};
         A += B;
         REQUIRE((A == 4));
+    }
+}
+
+TEST_CASE_TEMPLATE("gather and allgather", ValueType, int, float, double) {
+    int m = 7, n = 11;
+    DistMatrix<ValueType> A(m, n);
+    A = [](int i, int j) {
+        return 2 * i + j * j;
+    };
+    Matrix<ValueType> Aserial(m, n);
+    SUBCASE("gather") {
+        A.gather(Aserial.array.get());
+        Matrix<int> check(m, n);
+        check = [&Aserial](int i, int j) {
+            return Aserial(i, j) == 2 * i + j * j;
+        };
+        if (blacs::mpirank == 0) {
+            REQUIRE((check.sum() == m * n));
+        }
+    }
+    SUBCASE("allgather") {
+        A.allgather(Aserial.array.get());
+        Matrix<int> check(m, n);
+        check = [&Aserial](int i, int j) {
+            return Aserial(i, j) == 2 * i + j * j;
+        };
+        REQUIRE((check.sum() == m * n));
     }
 }

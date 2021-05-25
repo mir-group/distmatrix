@@ -117,9 +117,31 @@ public:
      */
     DistMatrix<ValueType> triangular_invert(const char uplo = 'L', const char unit_triangular='N');
 
+    /**
+     * Call `MPI_Win_fence`. Typically performed after a series of (possibly) non-local
+     * element accesses and `.set`s.
+     */
     void fence();
 
-    //protected:
+    /**
+     * Gather the entire matrix in the local array pointed to by `ptr` on MPI rank 0.
+     * The matrix will be stored in column-major order.
+     * This could be `&A(0,0)` with a matrix library like Eigen,
+     * or `A.array.get()` if A is a `Matrix<ValueType>`.
+     * @param ptr Pointer to the array where the matrix will be written.
+     */
+    void gather(ValueType *ptr);
+
+    /**
+     * Gather the entire matrix in the local array pointed to by `ptr` on MPI rank 0
+     * and then broadcast it to all MPI ranks.
+     * The matrix will be stored in column-major order.
+     * This could be `&A(0,0)` with a matrix library like Eigen,
+     * or `A.array.get()` if A is a `Matrix<ValueType>`.
+     * @param ptr Pointer to the array where the matrix will be written.
+     */
+    void allgather(ValueType *ptr);
+
     /**
      * Convert flat local index to local row and column index.
      * @param idx Flat index in the range `[0,nlocal)`.

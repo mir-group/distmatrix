@@ -6,7 +6,7 @@ extern "C" {
 void blacs_get_(int *, int *, int *);
 void blacs_exit_(int *);
 void blacs_pinfo_(int *, int *);
-void blacs_gridinit_(int *, char *, int *, int *);
+void blacs_gridinit_(int *, const char *, int *, int *);
 void blacs_gridinfo_(int *, int *, int *, int *, int *);
 void descinit_(int *, int *, int *, int *, int *, int *, int *, int *, int *, int *);
 void blacs_gridexit_(const int *);
@@ -51,10 +51,16 @@ void pdormqr_(char *side, char *trans, int *m, int *n, int *k, double *a, int *i
 void pctrtri_(const char *uplo, const char *diag, int *n, std::complex<float> *a, int *ia, int *ja, int *desca, int *info);
 void pztrtri_(const char *uplo, const char *diag, int *n, std::complex<double> *a, int *ia, int *ja, int *desca, int *info);
 
-void pspotrf_(const char *uplo , int *n , float *a , int *ia , int *ja , int *desca , int *info );
-void pdpotrf_(const char *uplo , int *n , double *a , int *ia , int *ja , int *desca , int *info );
-void pcpotrf_(const char *uplo , int *n , std::complex<float> *a , int *ia , int *ja , int *desca , int *info );
-void pzpotrf_(const char *uplo , int *n , std::complex<double> *a , int *ia , int *ja , int *desca , int *info );
+void pspotrf_(const char *uplo, int *n, float *a, int *ia, int *ja, int *desca, int *info);
+void pdpotrf_(const char *uplo, int *n, double *a, int *ia, int *ja, int *desca, int *info);
+void pcpotrf_(const char *uplo, int *n, std::complex<float> *a, int *ia, int *ja, int *desca, int *info);
+void pzpotrf_(const char *uplo, int *n, std::complex<double> *a, int *ia, int *ja, int *desca, int *info);
+
+void psgemr2d_(int *m, int *n, float *a, int *ia, int *ja, int *desca, float *b, int *ib, int *jb, int *descb, int *ictxt);
+void pdgemr2d_(int *m, int *n, double *a, int *ia, int *ja, int *desca, double *b, int *ib, int *jb, int *descb, int *ictxt);
+void pcgemr2d_(int *m, int *n, std::complex<float> *a, int *ia, int *ja, int *desca, std::complex<float> *b, int *ib, int *jb, int *descb, int *ictxt);
+void pzgemr2d_(int *m, int *n, std::complex<double> *a, int *ia, int *ja, int *desca, std::complex<double> *b, int *ib, int *jb, int *descb, int *ictxt);
+void pigemr2d_(int *m, int *n, int *a, int *ia, int *ja, int *desca, int *b, int *ib, int *jb, int *descb, int *ictxt);
 
 void pdsyev_(char *, char *, int *, double *, int *, int *, int *, double *,
              double *, int *, int *, int *, double *, int *, int *);

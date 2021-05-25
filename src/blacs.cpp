@@ -35,6 +35,7 @@ void blacs::initialize(int nprows, int npcols) {
 
 void blacs::finalize(int finalize_mpi) {
     int cont = !finalize_mpi;
+    blacs_gridexit_(&blacs::blacscontext);
     blacs_exit_(&cont);
 }
 

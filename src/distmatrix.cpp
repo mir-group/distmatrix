@@ -1,5 +1,6 @@
 
 #include <blacs.h>
+#include <cstring>
 #include <distmatrix.h>
 #include <exception>
 #include <extern_blacs.h>
@@ -352,8 +353,8 @@ DistMatrix<ValueType> DistMatrix<ValueType>::cholesky(const char uplo) {
         throw std::logic_error("cholesky called with unsupported type!");
     }
     check_info(info, "potrf");
-    LU = [&uplo](ValueType LUij, int i, int j){
-        if((uplo=='U' && j>=i) || (uplo=='L' && i>=j)){
+    LU = [&uplo](ValueType LUij, int i, int j) {
+        if ((uplo == 'U' && j >= i) || (uplo == 'L' && i >= j)) {
             return LUij;
         }
         return ValueType(0);
@@ -380,6 +381,50 @@ DistMatrix<ValueType> DistMatrix<ValueType>::triangular_invert(const char uplo, 
     check_info(info, "potrf");
 
     return LUinv;
+}
+template<class ValueType>
+void DistMatrix<ValueType>::gather(ValueType *ptr) {
+
+    int serialcontext, bigcontext, nprows, npcols, myprow, mypcol;
+
+    int info, what = -1, one = 1, zero = 0, m = this->nrows, n = this->ncols;
+    int serialdesc[9];
+
+    bigcontext = blacs::blacscontext;
+
+    blacs_get_(&what, &zero, &serialcontext);
+    blacs_gridinit_(&serialcontext, &blacs::blacslayout, &one, &one);
+    if (blacs::mpirank == 0) {
+        descinit_(&serialdesc[0], &m, &n, &m, &n, &zero, &zero, &serialcontext, &m, &info);
+        check_info(info, "descinit gather");
+    }
+    if constexpr (std::is_same_v<ValueType, float>) {
+        psgemr2d_(&m, &n, this->array.get(), &one, &one, &desc[0],
+                  ptr, &one, &one, &serialdesc[0], &bigcontext);
+    } else if constexpr (std::is_same_v<ValueType, double>) {
+        pdgemr2d_(&m, &n, this->array.get(), &one, &one, &desc[0],
+                  ptr, &one, &one, &serialdesc[0], &bigcontext);
+    } else if constexpr (std::is_same_v<ValueType, std::complex<float>>) {
+        pcgemr2d_(&m, &n, this->array.get(), &one, &one, &desc[0],
+                  ptr, &one, &one, &serialdesc[0], &bigcontext);
+    } else if constexpr (std::is_same_v<ValueType, std::complex<double>>) {
+        pzgemr2d_(&m, &n, this->array.get(), &one, &one, &desc[0],
+                  ptr, &one, &one, &serialdesc[0], &bigcontext);
+    } else if constexpr (std::is_same_v<ValueType, int>) {
+        pigemr2d_(&m, &n, this->array.get(), &one, &one, &desc[0],
+                  ptr, &one, &one, &serialdesc[0], &bigcontext);
+    } else {
+        throw std::logic_error("matmul called with unsupported type");
+    }
+    if (blacs::mpirank == 0) {
+        blacs_gridexit_(&serialcontext);
+    }
+}
+
+template<class ValueType>
+void DistMatrix<ValueType>::allgather(ValueType *ptr) {
+    gather(ptr);
+    MPI_Bcast(ptr, this->nrows * this->ncols, mpitype, 0, MPI_COMM_WORLD);
 }
 
 
