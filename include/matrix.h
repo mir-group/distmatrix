@@ -27,6 +27,7 @@ public:
      * @param ncols The number of columns.
      */
     Matrix(int nrows, int ncols);
+    Matrix(){};
 
     /**
      * Get an element of the matrix.

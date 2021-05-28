@@ -22,7 +22,7 @@ void delete_window(MPI_Win *window) {
 
 template<class ValueType>
 DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperblock, int ncolsperblock) : nrowsperblock(nrowsperblock), ncolsperblock(ncolsperblock),
-                                                                                                        Matrix<ValueType>(ndistrows, ndistcols), mpiwindow(new MPI_Win, delete_window) {
+                                                                                                        mpiwindow(new MPI_Win, delete_window) {
 //    if (blacs::nprows > ndistrows || blacs::npcols > ndistcols) {
 //        throw std::logic_error("process grid is larger than matrix - TODO");
 //    }
@@ -32,6 +32,8 @@ DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperbloc
     if (ncolsperblock < 1) {
         this->ncolsperblock = ncolsperblock = std::max(1, ndistcols / blacs::npcols / 4);
     }
+    this->nrows = ndistrows;
+    this->ncols = ndistcols;
 
     int zero = 0;
     int info;
@@ -39,6 +41,7 @@ DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperbloc
 
     this->nlocal = (this->nlocalrows) * (this->nlocalcols);
     this->array = std::shared_ptr<ValueType[]>(new ValueType[this->nlocal]);
+
     //printf("ip = %d, jp = %d, ndistrows = %d, ndistcols = %d, nlocalrows = %d\n",
     //     blacs::myprow, blacs::mypcol, ndistrows, ndistcols, this->nlocalrows);
     descinit_(&desc[0], &ndistrows, &ndistcols, &nrowsperblock, &ncolsperblock, &zero, &zero, &blacs::blacscontext, &this->nlocalrows, &info);
