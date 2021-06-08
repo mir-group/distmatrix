@@ -121,6 +121,17 @@ public:
     DistMatrix<ValueType> triangular_invert(const char uplo = 'L', const char unit_triangular='N');
 
     /**
+     * Solve the linear system Ax=b, assuming A is triangular.
+     * Note that x and b can only be column vectors, not matrices,
+     * since `p?trsv` is called.
+     * @param b The right-hand-side column vector, which will be overwritten with the solution.
+     * @param uplo 'L' if A is lower triangular, 'U' if A is upper triangular.
+     * @param transA 'N' to solve Ax=b, 'T' to solve A^Tx=b, 'C' to solve A^Hx=b.
+     * @param diag 'U' if A is known to be unit triangular, otherwise 'N'.
+     */
+    void triangular_solve(DistMatrix<ValueType> b, const char uplo='L', const char transA='N', const char diag='N');
+
+    /**
      * Call `MPI_Win_fence`. Typically performed after a series of (possibly) non-local
      * element accesses and `.set`s.
      */

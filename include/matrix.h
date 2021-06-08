@@ -173,7 +173,7 @@ public:
      */
     void print();
 
-    /*virtual *//**
+    /**
      * Matrix inversion, using QR factorization for extra stability.
      *
      * *Note:* Only supported for `float` and `double`, as it uses `?ormqr`.

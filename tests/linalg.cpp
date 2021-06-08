@@ -70,24 +70,24 @@ TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
     A = [&Aeig](int i, int j) {
         return Aeig(i, j);
     };
-    std::cout << "Created A" << std::endl; 
+    std::cout << "Created A" << std::endl;
 
     MatType b(m, 1);
-    std::cout << "created b" << std::endl; 
+    std::cout << "created b" << std::endl;
     Eigen::VectorXd beig = Eigen::VectorXd::Random(m);
-    std::cout << "created beig" << std::endl; 
+    std::cout << "created beig" << std::endl;
     MPI_Bcast(beig.data(), m, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    std::cout << "broadcast beig" << std::endl; 
+    std::cout << "broadcast beig" << std::endl;
     b = [&beig](int i, int j) {
         return beig(i, j);
     };
-    std::cout << "assigned values to b" << std::endl; 
+    std::cout << "assigned values to b" << std::endl;
 
     MatType QR(m, n);
     std::vector<double> tau;
     std::tie(QR, tau) = A.qr();
     MatType R(n, n);
-    R = [&QR](int i, int j) {return i > j ? 0 : QR(i, j);};
+    R = [&QR](int i, int j) { return i > j ? 0 : QR(i, j); };
     MatType Rinv = R.triangular_invert('U');
     MatType Q_b = QR.QT_matmul(b, tau);
     std::cout << "Q_b size " << Q_b.nrows << " " << Q_b.ncols << std::endl;
@@ -97,9 +97,7 @@ TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
     Eigen::HouseholderQR<Eigen::MatrixXd> qr(Aeig);
     Eigen::VectorXd Q_beig = (qr.householderQ().transpose() * beig).segment(0, n);
     Eigen::MatrixXd eye_mat = Eigen::MatrixXd::Identity(n, n);
-    Eigen::MatrixXd R_inv_eig = qr.matrixQR().block(0, 0, n, n)
-                       .triangularView<Eigen::Upper>()
-                       .solve(eye_mat);
+    Eigen::MatrixXd R_inv_eig = qr.matrixQR().block(0, 0, n, n).triangularView<Eigen::Upper>().solve(eye_mat);
     std::cout << "Done R_inv_eig" << std::endl;
     Eigen::VectorXd alpha_eig = R_inv_eig * Q_beig;
     std::cout << "Done alpha_eig" << std::endl;
@@ -111,16 +109,16 @@ TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
 
     double error = 0.0;
     for (int i = 0; i < n; i++) {
-      for (int j = 0; j < n; j++) {
-        error += std::abs(Rinv(i, j) - R_inv_eig(i, j));
-      }
+        for (int j = 0; j < n; j++) {
+            error += std::abs(Rinv(i, j) - R_inv_eig(i, j));
+        }
     }
     std::cout << "Rinv error " << error << std::endl;
     REQUIRE(error < 1e-12);
- 
+
     error = 0.0;
     for (int i = 0; i < n; i++) {
-      error += std::abs(Q_b(i, 0) - Q_beig(i));
+        error += std::abs(Q_b(i, 0) - Q_beig(i));
     }
     std::cout << "Q_b error " << error << std::endl;
     REQUIRE(error < 1e-12);
@@ -129,7 +127,7 @@ TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
     std::cout << "alpha compare" << std::endl;
     error = 0.0;
     for (int i = 0; i < n; i++) {
-      error += std::abs(alpha(i, 0) - alpha_eig(i));
+        error += std::abs(alpha(i, 0) - alpha_eig(i));
     }
     std::cout << "alpha error " << error << std::endl;
     REQUIRE(error < 1e-10);
@@ -209,3 +207,26 @@ TEST_CASE("general eigensolver") {
         REQUIRE(error_eigvecs < 1e-12);
     }
 }
+
+TEST_CASE("triangular solve") {
+    const int n = 13;
+    DistMatrix<double> A(n, n), x(n, 1);
+    Eigen::MatrixXd Aeig = Eigen::MatrixXd::Random(n, n),
+                    xeig = Eigen::MatrixXd::Random(n, 1);
+    A = [&Aeig](int i, int j) {
+        return j > i ? 0 : Aeig(i, j);
+    };
+    x = [&xeig](int i, int j) {
+        return xeig(i, j);
+    };
+    DistMatrix<double> b = A.matmul(x);
+    A.triangular_solve(b);
+    DistMatrix<double> error(n,1);
+    error = [&x, &b](int i, int j){
+        return std::abs(b(i,j) - x(i,j));
+    };
+    double error_sum = error.sum();
+    std::cout << "triangular solve error " << error_sum;
+    REQUIRE(error_sum < 1e-12);
+}
+

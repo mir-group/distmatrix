@@ -526,6 +526,27 @@ void DistMatrix<ValueType>::allgather(ValueType *ptr) {
     MPI_Bcast(ptr, this->nrows * this->ncols, mpitype, 0, MPI_COMM_WORLD);
 }
 
+template<class ValueType>
+void DistMatrix<ValueType>::triangular_solve(DistMatrix<ValueType> b, const char uplo, const char transA, const char unit_triangular) {
+    int incx = 1;
+    int zero = 0;
+    int one = 1;
+    int n = this->nrows;
+    int info;
+
+    if constexpr (std::is_same_v<ValueType, float>) {
+        pstrsv_(&uplo, &transA, &unit_triangular, &n, this->array.get(), &one, &one, &desc[0], b.array.get(), &one, &one, &(b.desc[0]), &incx);
+    } else if constexpr (std::is_same_v<ValueType, double>) {
+        pdtrsv_(&uplo, &transA, &unit_triangular, &n, this->array.get(), &one, &one, &desc[0], b.array.get(), &one, &one, &(b.desc[0]), &incx);
+    } else if constexpr (std::is_same_v<ValueType, std::complex<float>>) {
+        pctrsv_(&uplo, &transA, &unit_triangular, &n, this->array.get(), &one, &one, &desc[0], b.array.get(), &one, &one, &(b.desc[0]), &incx);
+    } else if constexpr (std::is_same_v<ValueType, std::complex<double>>) {
+        pztrsv_(&uplo, &transA, &unit_triangular, &n, this->array.get(), &one, &one, &desc[0], b.array.get(), &one, &one, &(b.desc[0]), &incx);
+    } else {
+        throw std::logic_error("triangular_invert called with unsupported type!");
+    }
+}
+
 
 template class DistMatrix<bool>;
 template class DistMatrix<int>;

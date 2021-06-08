@@ -62,6 +62,14 @@ void pcgemr2d_(int *m, int *n, std::complex<float> *a, int *ia, int *ja, int *de
 void pzgemr2d_(int *m, int *n, std::complex<double> *a, int *ia, int *ja, int *desca, std::complex<double> *b, int *ib, int *jb, int *descb, int *ictxt);
 void pigemr2d_(int *m, int *n, int *a, int *ia, int *ja, int *desca, int *b, int *ib, int *jb, int *descb, int *ictxt);
 
+void pstrsv_(const char *uplo , const char *trans , const char *diag , const int *n , const float *a , const int *ia , const int *ja , const int *desca , float *x , const int *ix , const int *jx , const int *descx , const int *incx );
+void pdtrsv_(const char *uplo , const char *trans , const char *diag , const int *n , const double *a , const int *ia , const int *ja , const int *desca , double *x , const int *ix , const int *jx , const int *descx , const int *incx );
+void pctrsv_(const char *uplo , const char *trans , const char *diag , const int *n , const std::complex<float> *a , const int *ia , const int *ja , const int *desca , std::complex<float> *x , const int *ix , const int *jx , const int *descx , const int *incx );
+void pztrsv_(const char *uplo , const char *trans , const char *diag , const int *n , const std::complex<double> *a , const int *ia , const int *ja , const int *desca , std::complex<double> *x , const int *ix , const int *jx , const int *descx , const int *incx );
+
+
+
+
 void pdsyev_(char *, char *, int *, double *, int *, int *, int *, double *,
              double *, int *, int *, int *, double *, int *, int *);
 //void pzelset_(std::complex<double> *, int *, int *, int *,
