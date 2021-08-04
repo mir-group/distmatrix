@@ -481,22 +481,38 @@ DistMatrix<ValueType> DistMatrix<ValueType>::triangular_invert(const char uplo, 
 
     return LUinv;
 }
+
 template<class ValueType>
 void DistMatrix<ValueType>::gather(ValueType *ptr) {
 
-    int serialcontext, bigcontext, nprows, npcols, myprow, mypcol;
+    int syscontext, allcontext, serialcontext, bigcontext;
+    int nprows, npcols, myprow, mypcol;
+    int nproc = blacs::nprows * blacs::npcols;
 
     int info, what = -1, one = 1, zero = 0, m = this->nrows, n = this->ncols;
     int serialdesc[9];
 
-    bigcontext = blacs::blacscontext;
+    // get the system default context
+    blacs_get_(&zero, &zero, &syscontext);
 
-    blacs_get_(&what, &zero, &serialcontext);
+    // Set up a process grid ctxt_all of size nproc
+    allcontext = syscontext;
+    blacs_gridinit_(&allcontext, &blacs::blacslayout, &nproc, &one);
+
+    bigcontext = syscontext;
+    blacs_gridinit_(&bigcontext, &blacs::blacslayout, &blacs::nprows, &blacs::npcols);
+
+    serialcontext = syscontext;
     blacs_gridinit_(&serialcontext, &blacs::blacslayout, &one, &one);
+
+    // Get the process coordinates in the grid with context ctxt
+    blacs_gridinfo_(&bigcontext, &blacs::nprows, &blacs::npcols, &myprow, &mypcol);
+
     if (blacs::mpirank == 0) {
         descinit_(&serialdesc[0], &m, &n, &m, &n, &zero, &zero, &serialcontext, &m, &info);
         check_info(info, "descinit gather");
     }
+
     if constexpr (std::is_same_v<ValueType, float>) {
         psgemr2d_(&m, &n, this->array.get(), &one, &one, &desc[0],
                   ptr, &one, &one, &serialdesc[0], &bigcontext);
@@ -515,6 +531,7 @@ void DistMatrix<ValueType>::gather(ValueType *ptr) {
     } else {
         throw std::logic_error("matmul called with unsupported type");
     }
+    blacs::barrier();
     if (blacs::mpirank == 0) {
         blacs_gridexit_(&serialcontext);
     }
