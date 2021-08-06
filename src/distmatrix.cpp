@@ -512,6 +512,7 @@ void DistMatrix<ValueType>::gather(ValueType *ptr) {
         descinit_(&serialdesc[0], &m, &n, &m, &n, &zero, &zero, &serialcontext, &m, &info);
         check_info(info, "descinit gather");
     }
+    MPI_Bcast(&serialdesc, 9, MPI_INT, 0, MPI_COMM_WORLD);
 
     if constexpr (std::is_same_v<ValueType, float>) {
         psgemr2d_(&m, &n, this->array.get(), &one, &one, &desc[0],
