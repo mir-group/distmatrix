@@ -10,7 +10,7 @@ include(external/CMakeLists.txt)
 
 target_include_directories(distmatrix PUBLIC include)
 target_include_directories(distmatrix PUBLIC external)
-target_link_libraries(distmatrix PUBLIC ${LAPACK_LIBRARIES})
+target_link_libraries(distmatrix PUBLIC ${LAPACK_LIBRARIES} -lgfortran)
 
 option(BUILD_TEST "Build the tests (downloads Eigen)" ON)
 if (BUILD_TEST)
