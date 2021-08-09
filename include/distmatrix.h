@@ -137,6 +137,8 @@ public:
      */
     void fence();
 
+    void scatter(ValueType *ptr, int i, int j, int p, int q);
+
     /**
      * Gather the entire matrix in the local array pointed to by `ptr` on MPI rank 0.
      * The matrix will be stored in column-major order.

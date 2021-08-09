@@ -215,12 +215,10 @@ DistMatrix<ValueType> DistMatrix<ValueType>::matmul(const DistMatrix<ValueType> 
         Ccolsperblock = B.nrowsperblock;
     }
 
-
     DistMatrix<ValueType> C(m, n, Crowsperblock, Ccolsperblock);
     ValueType beta(0);
     ValueType *A_ptr = this->array.get(), *B_ptr = B.array.get(), *C_ptr = C.array.get();
     int one = 1;
-    //    std::cout << "DISTMATRIX MATMUL\n";
     if constexpr (std::is_same_v<ValueType, float>) {
         psgemm_(&transA, &transB, &m, &n, &k, &alpha, A_ptr, &one, &one, &desc[0],
                 B_ptr, &one, &one, &(B.desc[0]), &beta,
@@ -480,6 +478,80 @@ DistMatrix<ValueType> DistMatrix<ValueType>::triangular_invert(const char uplo, 
     check_info(info, "trtri");
 
     return LUinv;
+}
+
+template<class ValueType>
+void DistMatrix<ValueType>::scatter(ValueType *ptr, int i0, int j0, int p, int q) {
+
+    int syscontext, allcontext, serialcontext, bigcontext;
+    int nprows, npcols, myprow, mypcol;
+    int nproc = blacs::nprows * blacs::npcols;
+
+    int info, what = -1, one = 1, zero = 0, m = this->nrows, n = this->ncols;
+    int serialdesc[9];
+    int i = i0 + 1; // p?gemr2d_ starts from 1
+    int j = j0 + 1;
+
+    // get the system default context
+    std::cout << "begin blacs_get_" << std::endl;
+    blacs_get_(&zero, &zero, &syscontext);
+    std::cout << "blacs_get_" << std::endl;
+
+    // Set up a process grid ctxt_all of size nproc
+    allcontext = syscontext;
+    blacs_gridinit_(&allcontext, &blacs::blacslayout, &nproc, &one);
+    std::cout << "blacs_gridinit" << std::endl;
+
+    bigcontext = syscontext;
+    blacs_gridinit_(&bigcontext, &blacs::blacslayout, &blacs::nprows, &blacs::npcols);
+    std::cout << "blacs_gridinit" << std::endl;
+
+    serialcontext = syscontext;
+    blacs_gridinit_(&serialcontext, &blacs::blacslayout, &one, &one);
+    std::cout << "blacs_gridinit" << std::endl;
+
+    if (blacs::mpirank == 0) {
+        descinit_(&serialdesc[0], &p, &q, &p, &q, &zero, &zero, &serialcontext, &p, &info);
+        check_info(info, "descinit scatter");
+    }
+    std::cout << "descinit" << std::endl;
+    MPI_Bcast(&serialdesc, 9, MPI_INT, 0, MPI_COMM_WORLD);
+
+    std::cout << "bcast" << std::endl;
+    if constexpr (std::is_same_v<ValueType, float>) {
+        std::cout << "getting into psgemr" << std::endl;
+        psgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+                  this->array.get(), &i, &j, &desc[0], &serialcontext);
+        std::cout << "finish psgemr" << std::endl;
+    } else if constexpr (std::is_same_v<ValueType, double>) {
+        std::cout << "getting into pdgemr" << std::endl;
+        pdgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+                  this->array.get(), &i, &j, &desc[0], &serialcontext);
+        std::cout << "finish pdgemr" << std::endl;
+    } else if constexpr (std::is_same_v<ValueType, std::complex<float>>) {
+        pcgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+                  this->array.get(), &i, &j, &desc[0], &serialcontext);
+    } else if constexpr (std::is_same_v<ValueType, std::complex<double>>) {
+        pzgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+                  this->array.get(), &i, &j, &desc[0], &serialcontext);
+    } else if constexpr (std::is_same_v<ValueType, int>) {
+        std::cout << "getting into pigemr" << std::endl;
+        std::cout << p << " " << q << std::endl;
+        std::cout << serialdesc[0] << std::endl;
+        std::cout << i << " " << j << std::endl;
+        std::cout << desc[0] << std::endl;
+        std::cout << serialcontext << std::endl;
+        pigemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+                  this->array.get(), &i, &j, &desc[0], &serialcontext);
+        std::cout << "finish pigemr" << std::endl;
+    } else {
+        throw std::logic_error("matmul called with unsupported type");
+    }
+    std::cout << "psgemr" << std::endl;
+    blacs::barrier();
+    if (blacs::mpirank == 0) {
+        blacs_gridexit_(&serialcontext);
+    }
 }
 
 template<class ValueType>

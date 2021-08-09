@@ -111,7 +111,6 @@ TEST_CASE_TEMPLATE("arithmetic and boolean", MatType, Matrix<int>, DistMatrix<in
 TEST_CASE_TEMPLATE("gather and allgather", ValueType, int, float, double) {
     int m = 7, n = 11;
     DistMatrix<ValueType> A(m, n);
-    DistMatrix<ValueType> C(m, n);
     A = [](int i, int j) {
         return 2 * i + j * j;
     };
@@ -126,10 +125,7 @@ TEST_CASE_TEMPLATE("gather and allgather", ValueType, int, float, double) {
     blacs::barrier();
     SUBCASE("gather") {
         A.gather(Aserial.array.get());
-        std::cout << "Done A gather" << std::endl;
-
         B.gather(Bserial.array.get());
-        std::cout << "Done B gather" << std::endl;
 
         Matrix<int> check(m, n);
         check = [&Aserial](int i, int j) {
@@ -150,4 +146,51 @@ TEST_CASE_TEMPLATE("gather and allgather", ValueType, int, float, double) {
         };
         REQUIRE((check.sum() == m * n));
     }
+}
+
+TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
+    int m = 1, n = 11;
+    int M = 11, N = 16;
+    DistMatrix<ValueType> A(M, N);
+    A = [](int i, int j) {
+        return -1;
+    };
+
+    int r = blacs::mpirank;
+    Matrix<ValueType> Aserial(m, n);
+    Aserial = [](int i, int j) {
+        return j * j * r * r;
+    };
+    blacs::barrier();
+
+    A.scatter(Aserial.array.get(), r, 0, m, n);
+
+//    DistMatrix<ValueType> B(M, N);
+//    B = [](int i, int j) {
+//        return -1;
+//    };
+//
+//    Matrix<ValueType> Bserial(m, n);
+//    Bserial = [](int i, int j) {
+//        return 2 * i + j * j;
+//    };
+//    blacs::barrier();
+//
+//    B.scatter(Bserial.array.get(), M-m, N-n, m, n);
+
+    int world_size;
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+    for (int k = 0; k < world_size; k++) {
+      Matrix<int> check(m, n);
+      check = [&A](int i, int j) {
+          return A(i, j) == j * j * k * k;
+      };
+      REQUIRE((check.sum() == m * n));
+    }
+
+    Matrix<int> check0(M, N);
+    check0 = [&A](int i, int j) {
+        return A(i, j) == -1;
+    };
+    REQUIRE((check.sum() == m * n));
 }
