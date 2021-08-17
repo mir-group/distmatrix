@@ -137,6 +137,19 @@ public:
      */
     void fence();
 
+    /**
+     * Scatter a serial matrix with pointer `ptr` on MPI rank 0 to a submatrix of a DistMatrix.
+     * The matrix will be stored in column-major order.
+     * This could be `&A(0,0)` with a matrix library like Eigen,
+     * or `A.array.get()` if A is a `Matrix<ValueType>`.
+     * The serial matrix must have size pxq, and it is copied to the (i:i+p, j:j+q) submatrix
+     * of the DistMatrix.
+     * @param ptr Pointer to the array of the matrix to be copied.
+     * @param i Integer index of the first row of the submatrix in the whole DistMatrix.
+     * @param j Integer index of the first column of the submatrix in the whole DistMatrix.
+     * @param p Integer number of rows of the submatrix.
+     * @param q Integer number of columns of the submatrix.
+     */
     void scatter(ValueType *ptr, int i, int j, int p, int q);
 
     /**
