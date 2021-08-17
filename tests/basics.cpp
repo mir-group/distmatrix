@@ -150,7 +150,7 @@ TEST_CASE_TEMPLATE("gather and allgather", ValueType, int, float, double) {
 
 TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
     int M = 11, N = 16;
-    int m = M, n = N;
+    int m = 1, n = 11;
     DistMatrix<ValueType> A(M, N);
     A = [](int i, int j) {
         return -1;
