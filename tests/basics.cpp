@@ -148,9 +148,9 @@ TEST_CASE_TEMPLATE("gather and allgather", ValueType, int, float, double) {
     }
 }
 
-TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
-    int m = 1, n = 11;
+TEST_CASE_TEMPLATE("scatter", ValueType, int) { //, float, double) {
     int M = 11, N = 16;
+    int m = M, n = N;
     DistMatrix<ValueType> A(M, N);
     A = [](int i, int j) {
         return -1;
@@ -158,12 +158,15 @@ TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
 
     int r = blacs::mpirank;
     Matrix<ValueType> Aserial(m, n);
-    Aserial = [](int i, int j) {
-        return j * j * r * r;
-    };
-    blacs::barrier();
+    if (r == 0) {
+        Aserial = [&r](int i, int j) {
+            return j * j * r * r;
+        };
+    }
+    //blacs::barrier();
 
-    A.scatter(Aserial.array.get(), r, 0, m, n);
+    A.scatter(Aserial.array.get(), 0, 0, m, n);
+    blacs::barrier();
 
 //    DistMatrix<ValueType> B(M, N);
 //    B = [](int i, int j) {
@@ -180,11 +183,13 @@ TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
 
     int world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-    for (int k = 0; k < world_size; k++) {
+    //for (int k = 0; k < world_size; k++) {
+    for (int k = 0; k < 1; k++) {
       Matrix<int> check(m, n);
-      check = [&A](int i, int j) {
+      check = [&A, &k](int i, int j) {
           return A(i, j) == j * j * k * k;
       };
+      std::cout << "rank=" << blacs::mpirank << ", check sum=" << check.sum() << std::endl; 
       REQUIRE((check.sum() == m * n));
     }
 
@@ -192,5 +197,5 @@ TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
     check0 = [&A](int i, int j) {
         return A(i, j) == -1;
     };
-    REQUIRE((check.sum() == m * n));
+    REQUIRE((check0.sum() == M * N - m * n));
 }
