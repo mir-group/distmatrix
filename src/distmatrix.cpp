@@ -493,7 +493,6 @@ void DistMatrix<ValueType>::scatter(ValueType *ptr, int i0, int j0, int p, int q
 
     // get the system default context
     blacs_get_(&zero, &zero, &syscontext);
-    std::cout << "blacs_get_" << std::endl;
 
     bigcontext = syscontext;
     blacs_gridinit_(&bigcontext, &blacs::blacslayout, &blacs::nprows, &blacs::npcols);
@@ -506,7 +505,6 @@ void DistMatrix<ValueType>::scatter(ValueType *ptr, int i0, int j0, int p, int q
         check_info(info, "descinit scatter");
     }
     MPI_Bcast(&serialdesc, 9, MPI_INT, 0, MPI_COMM_WORLD);
-//    MPI_Bcast(&serialcontext, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     if constexpr (std::is_same_v<ValueType, float>) {
         psgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
@@ -521,25 +519,15 @@ void DistMatrix<ValueType>::scatter(ValueType *ptr, int i0, int j0, int p, int q
         pzgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
                   this->array.get(), &i, &j, &desc[0], &bigcontext);
     } else if constexpr (std::is_same_v<ValueType, int>) {
-        std::cout << "getting into pigemr" << std::endl;
-        std::cout << p << " " << q << std::endl;
-        std::cout << serialdesc[0] << std::endl;
-        std::cout << i << " " << j << std::endl;
-        std::cout << desc[0] << std::endl;
-        std::cout << serialcontext << std::endl;
         pigemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
                   this->array.get(), &i, &j, &desc[0], &bigcontext);
-        std::cout << "rank=" << blacs::mpirank << ", finish pigemr" << std::endl;
     } else {
         throw std::logic_error("matmul called with unsupported type");
     }
-    std::cout << "rank=" << blacs::mpirank << ", psgemr" << std::endl;
     blacs::barrier();
     if (blacs::mpirank == 0) {
         blacs_gridexit_(&serialcontext);
     }
-    std::cout << "done gridexit" << std::endl;
-
 }
 
 
