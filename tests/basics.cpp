@@ -163,23 +163,21 @@ TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
             return j * j * r * r;
         };
     }
-    //blacs::barrier();
 
     A.scatter(Aserial.array.get(), 0, 0, m, n);
-    blacs::barrier();
 
-//    DistMatrix<ValueType> B(M, N);
-//    B = [](int i, int j) {
-//        return -1;
-//    };
-//
-//    Matrix<ValueType> Bserial(m, n);
-//    Bserial = [](int i, int j) {
-//        return 2 * i + j * j;
-//    };
-//    blacs::barrier();
-//
-//    B.scatter(Bserial.array.get(), M-m, N-n, m, n);
+    // Try another scatter
+    DistMatrix<ValueType> B(M, N);
+    B = [](int i, int j) {
+        return -1;
+    };
+
+    Matrix<ValueType> Bserial(m, n);
+    Bserial = [](int i, int j) {
+        return 2 * i + j * j;
+    };
+
+    B.scatter(Bserial.array.get(), M-m, N-n, m, n);
 
     int world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
