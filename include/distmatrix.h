@@ -137,6 +137,24 @@ public:
      */
     void fence();
 
+    /**
+     * Scatter a serial or distributed matrix A with pointer `ptr` to 
+     * a submatrix of a DistMatrix B.
+     * The matrix will be stored in column-major order.
+     * This could be `&A(0,0)` with a matrix library like Eigen,
+     * or `A.array.get()` if A is a `Matrix<ValueType>`.
+     * The total size of A is pxq, and it is copied to the (i:i+p, j:j+q) submatrix of B.
+     * i, j, p, q, mb, nb should be the same across different processors, while lld
+     * can be different depending on how many rows are on each processor.
+     * @param ptr Pointer to the array of the matrix to be copied.
+     * @param i Integer index of the first row of the submatrix in the whole DistMatrix.
+     * @param j Integer index of the first column of the submatrix in the whole DistMatrix.
+     * @param p Integer number of rows of the submatrix.
+     * @param q Integer number of columns of the submatrix.
+     * @param mb Integer number of rows of each block (not the number of local rows on current processor).
+     * @param nb Integer number of columns of each block (not the local number of columns on current processor).
+     * @param lld Integer number of local rows on the current processor to be copied.
+     */
     void scatter(ValueType *ptr, int i, int j, int p, int q, int mb, int nb, int lld);
 
     /**
