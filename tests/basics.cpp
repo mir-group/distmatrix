@@ -154,6 +154,11 @@ TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
 
     int M = 11, N = 16;
     int m = 2, n = 11;
+    if (blacs::mpirank == world_size - 1) m = 1;
+    int p;
+    MPI_Allreduce(&m, &p, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    std::cout << "p=" << p << std::endl;
+
     DistMatrix<ValueType> A(M, N);
     A = [](int i, int j) {
         return -1;
@@ -161,21 +166,19 @@ TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
 
     int r = blacs::mpirank;
     Matrix<ValueType> Aserial(m, n);
-//    if (r == 0) {
-        Aserial = [&r](int i, int j) {
-            return j * j * r * r;
-        };
-//    }
+    Aserial = [&r](int i, int j) {
+        return j * j * r * r;
+    };
 
-    A.scatter(Aserial.array.get(), 0, 0, m * world_size, n, m, n);
+    A.scatter(Aserial.array.get(), 0, 0, p, n, 2, n, m);
     blacs::barrier();
     if (blacs::mpirank == 0) {
-    for (int i = 0; i < M; i++) {
-        for (int j = 0; j < N; j++) {
-            std::cout << A(i, j) << " ";
+        for (int i = 0; i < M; i++) {
+            for (int j = 0; j < N; j++) {
+                std::cout << A(i, j) << " ";
+            }
+            std::cout << std::endl;
         }
-        std::cout << std::endl;
-    }
     }
     std::cout << std::endl;
 
@@ -198,23 +201,26 @@ TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
         return -1;
     };
 
+    int row = 0;
     for (int k = 0; k < world_size; k++) {
+      int m = 2;
+      if (k == world_size - 1) m = 1;
       for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
-          int r_ind = k * m + i;
-          Acheck.set(r_ind, j, j * j * k * k);
+          Acheck.set(row, j, j * j * k * k);
         }
+        row += 1;
       }
     }
 
     if (blacs::mpirank == 0) {
         std::cout << "Acheck" << std::endl;
-    for (int i = 0; i < M; i++) {
-        for (int j = 0; j < N; j++) {
-            std::cout << Acheck(i, j) << " ";
+        for (int i = 0; i < M; i++) {
+            for (int j = 0; j < N; j++) {
+                std::cout << Acheck(i, j) << " ";
+            }
+            std::cout << std::endl;
         }
-        std::cout << std::endl;
-    }
     }
     std::cout << std::endl;
 
@@ -226,9 +232,4 @@ TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
     std::cout << "check sum=" << check.sum() << std::endl; 
     REQUIRE((check.sum() == M * N));
 
-    Matrix<int> check0(M, N);
-    check0 = [&A](int i, int j) {
-        return A(i, j) == -1;
-    };
-    REQUIRE((check0.sum() == M * N - m * n * world_size));
 }

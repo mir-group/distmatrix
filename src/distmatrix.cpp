@@ -481,8 +481,8 @@ DistMatrix<ValueType> DistMatrix<ValueType>::triangular_invert(const char uplo, 
 }
 
 template<class ValueType>
-void DistMatrix<ValueType>::scatter(ValueType *ptr, int i0, int j0, int p, int q, int mb, int nb) {
-    int syscontext, allcontext, serialcontext, bigcontext;
+void DistMatrix<ValueType>::scatter(ValueType *ptr, int i0, int j0, int p, int q, int mb, int nb, int lld) {
+    int syscontext, ptrcontext, bigcontext;
     int nprows, npcols, myprow, mypcol;
     int nproc = blacs::nprows * blacs::npcols;
 
@@ -497,15 +497,15 @@ void DistMatrix<ValueType>::scatter(ValueType *ptr, int i0, int j0, int p, int q
     bigcontext = syscontext;
     blacs_gridinit_(&bigcontext, &blacs::blacslayout, &blacs::nprows, &blacs::npcols);
 
-    serialcontext = syscontext;
-    blacs_gridinit_(&serialcontext, &blacs::blacslayout, &nproc, &one);
+    ptrcontext = syscontext;
+    int ptr_nprow = p / mb;
+    blacs_gridinit_(&ptrcontext, &blacs::blacslayout, &nproc, &one);
 
-    //if (blacs::mpirank == rank) {
-        descinit_(&serialdesc[0], &p, &q, &mb, &nb, &zero, &zero, &serialcontext, &mb, &info);
-        check_info(info, "descinit scatter");
-    //}
-//    MPI_Bcast(&serialdesc, 9, MPI_INT, rank, MPI_COMM_WORLD);
+    std::cout << "descinit" << std::endl;
+    descinit_(&serialdesc[0], &p, &q, &mb, &nb, &zero, &zero, &ptrcontext, &lld, &info);
+    check_info(info, "descinit scatter");
 
+    std::cout << "p?gemr2d" << std::endl;
     if constexpr (std::is_same_v<ValueType, float>) {
         psgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
                   this->array.get(), &i, &j, &desc[0], &bigcontext);
@@ -525,9 +525,8 @@ void DistMatrix<ValueType>::scatter(ValueType *ptr, int i0, int j0, int p, int q
         throw std::logic_error("matmul called with unsupported type");
     }
     blacs::barrier();
-//    if (blacs::mpirank == rank) {
-        blacs_gridexit_(&serialcontext);
-//    }
+    std::cout << "gridexit" << std::endl;
+    blacs_gridexit_(&ptrcontext);
 }
 
 
