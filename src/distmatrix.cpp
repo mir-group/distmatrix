@@ -487,7 +487,7 @@ void DistMatrix<ValueType>::scatter(ValueType *ptr, int i0, int j0, int p, int q
     int nproc = blacs::nprows * blacs::npcols;
 
     int info, what = -1, one = 1, zero = 0, m = this->nrows, n = this->ncols;
-    int serialdesc[9];
+    int ptrdesc[9];
     int i = i0 + 1; // p?gemr2d_ starts from 1
     int j = j0 + 1;
 
@@ -498,34 +498,41 @@ void DistMatrix<ValueType>::scatter(ValueType *ptr, int i0, int j0, int p, int q
     blacs_gridinit_(&bigcontext, &blacs::blacslayout, &blacs::nprows, &blacs::npcols);
 
     ptrcontext = syscontext;
-    int ptr_nprow = p / mb;
-    blacs_gridinit_(&ptrcontext, &blacs::blacslayout, &nproc, &one);
+    int ptr_nprow, ptr_npcol;
+    if (p % mb == 0) {
+        ptr_nprow = p / mb;
+    } else {
+        ptr_nprow = p / mb + 1;
+    }
+    if (q % nb == 0) {
+        ptr_npcol = q / nb;
+    } else {
+        ptr_npcol = q / nb + 1;
+    }
+    blacs_gridinit_(&ptrcontext, &blacs::blacslayout, &ptr_nprow, &ptr_npcol);
 
-    std::cout << "descinit" << std::endl;
-    descinit_(&serialdesc[0], &p, &q, &mb, &nb, &zero, &zero, &ptrcontext, &lld, &info);
+    descinit_(&ptrdesc[0], &p, &q, &mb, &nb, &zero, &zero, &ptrcontext, &lld, &info);
     check_info(info, "descinit scatter");
 
-    std::cout << "p?gemr2d" << std::endl;
     if constexpr (std::is_same_v<ValueType, float>) {
-        psgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+        psgemr2d_(&p, &q, ptr, &one, &one, &ptrdesc[0],
                   this->array.get(), &i, &j, &desc[0], &bigcontext);
     } else if constexpr (std::is_same_v<ValueType, double>) {
-        pdgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+        pdgemr2d_(&p, &q, ptr, &one, &one, &ptrdesc[0],
                   this->array.get(), &i, &j, &desc[0], &bigcontext);
     } else if constexpr (std::is_same_v<ValueType, std::complex<float>>) {
-        pcgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+        pcgemr2d_(&p, &q, ptr, &one, &one, &ptrdesc[0],
                   this->array.get(), &i, &j, &desc[0], &bigcontext);
     } else if constexpr (std::is_same_v<ValueType, std::complex<double>>) {
-        pzgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+        pzgemr2d_(&p, &q, ptr, &one, &one, &ptrdesc[0],
                   this->array.get(), &i, &j, &desc[0], &bigcontext);
     } else if constexpr (std::is_same_v<ValueType, int>) {
-        pigemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+        pigemr2d_(&p, &q, ptr, &one, &one, &ptrdesc[0],
                   this->array.get(), &i, &j, &desc[0], &bigcontext);
     } else {
         throw std::logic_error("matmul called with unsupported type");
     }
     blacs::barrier();
-    std::cout << "gridexit" << std::endl;
     blacs_gridexit_(&ptrcontext);
 }
 

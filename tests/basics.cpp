@@ -153,8 +153,9 @@ TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
     int M = 11, N = 16;
-    int m = 2, n = 11;
-    if (blacs::mpirank == world_size - 1) m = 1;
+    int mb = 2, nb = 11;
+    int m = mb, n = nb;
+    if (world_size > 1 && blacs::mpirank == world_size - 1) m = mb - 1;
     int p;
     MPI_Allreduce(&m, &p, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     std::cout << "p=" << p << std::endl;
@@ -170,7 +171,7 @@ TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
         return j * j * r * r;
     };
 
-    A.scatter(Aserial.array.get(), 0, 0, p, n, 2, n, m);
+    A.scatter(Aserial.array.get(), 0, 0, p, n, mb, n, m);
     blacs::barrier();
     if (blacs::mpirank == 0) {
         for (int i = 0; i < M; i++) {
@@ -204,7 +205,7 @@ TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
     int row = 0;
     for (int k = 0; k < world_size; k++) {
       int m = 2;
-      if (k == world_size - 1) m = 1;
+      if (world_size > 1 && k == world_size - 1) m = 1;
       for (int i = 0; i < m; i++) {
         for (int j = 0; j < n; j++) {
           Acheck.set(row, j, j * j * k * k);
