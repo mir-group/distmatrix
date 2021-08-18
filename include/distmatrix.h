@@ -137,7 +137,7 @@ public:
      */
     void fence();
 
-    void scatter(ValueType *ptr, int i, int j, int p, int q);
+    void scatter(ValueType *ptr, int i, int j, int p, int q, int mb, int nb);
 
     /**
      * Gather the entire matrix in the local array pointed to by `ptr` on MPI rank 0.
