@@ -481,7 +481,58 @@ DistMatrix<ValueType> DistMatrix<ValueType>::triangular_invert(const char uplo, 
 }
 
 template<class ValueType>
-void DistMatrix<ValueType>::scatter(ValueType *ptr, int i0, int j0, int p, int q, int mb, int nb, int lld) {
+void DistMatrix<ValueType>::scatter(ValueType *ptr, int i0, int j0, int p, int q) {
+    int syscontext, allcontext, serialcontext, bigcontext;
+    int nprows, npcols, myprow, mypcol;
+    int nproc = blacs::nprows * blacs::npcols;
+
+    int info, what = -1, one = 1, zero = 0, m = this->nrows, n = this->ncols;
+    int serialdesc[9];
+    int i = i0 + 1; // p?gemr2d_ starts from 1
+    int j = j0 + 1;
+
+    // get the system default context
+    blacs_get_(&zero, &zero, &syscontext);
+
+    bigcontext = syscontext;
+    blacs_gridinit_(&bigcontext, &blacs::blacslayout, &blacs::nprows, &blacs::npcols);
+
+    serialcontext = syscontext;
+    blacs_gridinit_(&serialcontext, &blacs::blacslayout, &one, &one);
+
+    if (blacs::mpirank == 0) {
+        descinit_(&serialdesc[0], &p, &q, &p, &q, &zero, &zero, &serialcontext, &p, &info);
+        check_info(info, "descinit scatter");
+    }
+    MPI_Bcast(&serialdesc, 9, MPI_INT, 0, MPI_COMM_WORLD);
+
+    if constexpr (std::is_same_v<ValueType, float>) {
+        psgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+                  this->array.get(), &i, &j, &desc[0], &bigcontext);
+    } else if constexpr (std::is_same_v<ValueType, double>) {
+        pdgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+                  this->array.get(), &i, &j, &desc[0], &bigcontext);
+    } else if constexpr (std::is_same_v<ValueType, std::complex<float>>) {
+        pcgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+                  this->array.get(), &i, &j, &desc[0], &bigcontext);
+    } else if constexpr (std::is_same_v<ValueType, std::complex<double>>) {
+        pzgemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+                  this->array.get(), &i, &j, &desc[0], &bigcontext);
+    } else if constexpr (std::is_same_v<ValueType, int>) {
+        pigemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
+                  this->array.get(), &i, &j, &desc[0], &bigcontext);
+    } else {
+        throw std::logic_error("matmul called with unsupported type");
+    }
+    blacs::barrier();
+    if (blacs::mpirank == 0) {
+        blacs_gridexit_(&serialcontext);
+    }
+}
+
+
+template<class ValueType>
+void DistMatrix<ValueType>::collect(ValueType *ptr, int i0, int j0, int p, int q, int mb, int nb, int lld) {
     int syscontext, ptrcontext, bigcontext;
     int nprows, npcols, myprow, mypcol;
     int nproc = blacs::nprows * blacs::npcols;

@@ -155,7 +155,9 @@ public:
      * @param nb Integer number of columns of each block (not the local number of columns on current processor).
      * @param lld Integer number of local rows on the current processor to be copied.
      */
-    void scatter(ValueType *ptr, int i, int j, int p, int q, int mb, int nb, int lld);
+    void collect(ValueType *ptr, int i, int j, int p, int q, int mb, int nb, int lld);
+
+    void scatter(ValueType *ptr, int i0, int j0, int p, int q);
 
     /**
      * Gather the entire matrix in the local array pointed to by `ptr` on MPI rank 0.

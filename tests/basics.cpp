@@ -148,7 +148,7 @@ TEST_CASE_TEMPLATE("gather and allgather", ValueType, int, float, double) {
     }
 }
 
-TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
+TEST_CASE_TEMPLATE("collect", ValueType, int, float, double) {
     int world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
@@ -171,7 +171,7 @@ TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
         return j * j * r * r;
     };
 
-    A.scatter(Aserial.array.get(), 0, 0, p, n, mb, n, m);
+    A.collect(Aserial.array.get(), 0, 0, p, n, mb, n, m);
     blacs::barrier();
     if (blacs::mpirank == 0) {
         for (int i = 0; i < M; i++) {
@@ -182,20 +182,6 @@ TEST_CASE_TEMPLATE("scatter", ValueType, int, float, double) {
         }
     }
     std::cout << std::endl;
-
-
-//    // Try another scatter
-//    DistMatrix<ValueType> B(M, N);
-//    B = [](int i, int j) {
-//        return -1;
-//    };
-//
-//    Matrix<ValueType> Bserial(m, n);
-//    Bserial = [](int i, int j) {
-//        return 2 * i + j * j;
-//    };
-//
-//    B.scatter(Bserial.array.get(), M-m, N-n, m, n, r);
 
     Matrix<ValueType> Acheck(M, N);
     Acheck = [](int i, int j) {
