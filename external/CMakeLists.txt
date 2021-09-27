@@ -32,6 +32,7 @@ endif ()
 find_package(MPI REQUIRED)
 target_link_libraries(distmatrix PUBLIC MPI::MPI_CXX)
 
+set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
 find_library(SCALAPACK_LIB NAMES mkl_scalapack_lp64 scalapack scalapack-openmpi PATHS ENV LD_LIBRARY_PATH)
 if(${SCALAPACK_LIB} MATCHES NOTFOUND)
     ExternalProject_Add(scalapack_dep
