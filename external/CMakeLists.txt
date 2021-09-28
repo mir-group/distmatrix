@@ -4,9 +4,10 @@ add_definitions(${GCC_COMPILE_FLAGS})
 find_package(LAPACK REQUIRED)
 message("Found LAPACK: ${LAPACK_LIBRARIES}")
 
-if (LAPACK_LIBRARIES MATCHES mkl)
-    add_compile_definitions(USE_MKL)
-else ()
+#if (LAPACK_LIBRARIES MATCHES mkl)
+#    add_compile_definitions(USE_MKL)
+#else ()
+if(${LAPACK_LIB} MATCHES NOTFOUND)
     message("LAPACK does not match mkl, building LAPACKE and CBLAS interfaces.")
     include(ExternalProject)
     ExternalProject_Add(lapack_dep
@@ -22,8 +23,8 @@ else ()
             -DCMAKE_Fortran_COMPILER=${CMAKE_Fortran_COMPILER}
             -DLAPACKE=ON
             -DCBLAS=ON
-            -DUSE_OPTIMIZED_BLAS=ON
-            -DUSE_OPTIMIZED_LAPACK=ON
+            -DUSE_OPTIMIZED_BLAS=OFF
+            -DUSE_OPTIMIZED_LAPACK=OFF
             )
     add_dependencies(distmatrix lapack_dep)
     target_include_directories(distmatrix PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/lapack_build/include)
