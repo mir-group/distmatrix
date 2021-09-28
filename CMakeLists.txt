@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.16)
 project(distmatrix C CXX Fortran)
 
 set(CMAKE_CXX_STANDARD 17)
-
+set(GCC_COMPILE_FLAGS "-fPIC")
+add_definitions(${GCC_COMPILE_FLAGS})
 
 add_library(distmatrix src/matrix.cpp include/matrix.h src/distmatrix.cpp include/distmatrix.h src/blacs.cpp include/blacs.h)
 

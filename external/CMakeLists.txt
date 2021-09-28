@@ -1,3 +1,6 @@
+set(GCC_COMPILE_FLAGS "-fPIC")
+add_definitions(${GCC_COMPILE_FLAGS})
+
 find_package(LAPACK REQUIRED)
 message("Found LAPACK: ${LAPACK_LIBRARIES}")
 
