@@ -1,13 +1,11 @@
-set(GCC_COMPILE_FLAGS "-fPIC")
-add_definitions(${GCC_COMPILE_FLAGS})
+include(ExternalProject)
 
 find_package(LAPACK REQUIRED)
 message("Found LAPACK: ${LAPACK_LIBRARIES}")
 
-#if (LAPACK_LIBRARIES MATCHES mkl)
-#    add_compile_definitions(USE_MKL)
-#else ()
-if(${LAPACK_LIB} MATCHES NOTFOUND)
+if (LAPACK_LIBRARIES MATCHES mkl)
+    add_compile_definitions(USE_MKL)
+else ()
     message("LAPACK does not match mkl, building LAPACKE and CBLAS interfaces.")
     include(ExternalProject)
     ExternalProject_Add(lapack_dep
@@ -23,8 +21,8 @@ if(${LAPACK_LIB} MATCHES NOTFOUND)
             -DCMAKE_Fortran_COMPILER=${CMAKE_Fortran_COMPILER}
             -DLAPACKE=ON
             -DCBLAS=ON
-            -DUSE_OPTIMIZED_BLAS=OFF
-            -DUSE_OPTIMIZED_LAPACK=OFF
+            -DUSE_OPTIMIZED_BLAS=ON
+            -DUSE_OPTIMIZED_LAPACK=ON
             )
     add_dependencies(distmatrix lapack_dep)
     target_include_directories(distmatrix PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/lapack_build/include)
@@ -38,6 +36,8 @@ target_link_libraries(distmatrix PUBLIC MPI::MPI_CXX)
 
 find_library(SCALAPACK_LIB NAMES mkl_scalapack_lp64 scalapack scalapack-openmpi PATHS ENV LD_LIBRARY_PATH)
 if(${SCALAPACK_LIB} MATCHES NOTFOUND)
+    set(GCC_COMPILE_FLAGS "-fPIC")
+    add_definitions(${GCC_COMPILE_FLAGS})
     ExternalProject_Add(scalapack_dep
             BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/scalapack_build
             SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/scalapack_src
@@ -45,6 +45,8 @@ if(${SCALAPACK_LIB} MATCHES NOTFOUND)
             INSTALL_COMMAND ""
             UPDATE_COMMAND ""
             CMAKE_ARGS
+            -DCMAKE_Fortran_FLAGS=${GCC_COMPILE_FLAGS}
+            -DCMAKE_C_FLAGS=${GCC_COMPILE_FLAGS}
             -DCMAKE_BUILD_TYPE=Release
             -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
             -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
