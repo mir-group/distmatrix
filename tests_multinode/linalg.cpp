@@ -64,7 +64,7 @@ TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
     MatType R(n, n);
     R = [&QR](int i, int j) {return i > j ? 0 : QR(i, j, true);};
     MatType Rinv = R.triangular_invert('U');
-    MatType Q_b = QR.QT_matmul(b, tau);
+    MatType Q_b = QR.Q_matmul(b, tau, 'L', 'T');
     std::cout << "Q_b size " << Q_b.nrows << " " << Q_b.ncols << std::endl;
     MatType alpha = Rinv.matmul(Q_b, 1.0, 'N', 'N');
     std::cout << "Done distmatrix alpha" << std::endl;

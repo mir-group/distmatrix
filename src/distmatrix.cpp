@@ -1,4 +1,3 @@
-
 #include <blacs.h>
 #include <cstring>
 #include <distmatrix.h>
@@ -196,9 +195,9 @@ ValueType DistMatrix<ValueType>::sum() {
 }
 template<class ValueType>
 DistMatrix<ValueType> DistMatrix<ValueType>::matmul(const DistMatrix<ValueType> &B, const ValueType alpha, const char transA, const char transB) {
-    int m, k, n;
+    int m, k, n, l;
     int Crowsperblock, Ccolsperblock;
-    if (transA == 'N' or transA == 'n') {
+    if (transA == 'N' || transA == 'n') {
         m = this->nrows;
         k = this->ncols;
         Crowsperblock = this->nrowsperblock;
@@ -207,12 +206,21 @@ DistMatrix<ValueType> DistMatrix<ValueType>::matmul(const DistMatrix<ValueType> 
         k = this->nrows;
         Crowsperblock = this->ncolsperblock;
     }
-    if (transB == 'N' or transB == 'n') {
+    if (transB == 'N' || transB == 'n') {
         n = B.ncols;
+        l = B.nrows;
         Ccolsperblock = B.ncolsperblock;
     } else {
         n = B.nrows;
+        l = B.ncols;
         Ccolsperblock = B.nrowsperblock;
+    }
+
+    // Detect shape mismatch of the two matrices
+    if (k != l) {
+        std::stringstream errmsg;
+        errmsg << "A(" << this->nrows << ", " << this->ncols << ") does not match B(" << B.nrows << ", " << B.ncols << ")";
+        throw std::logic_error(errmsg.str());
     }
 
     DistMatrix<ValueType> C(m, n, Crowsperblock, Ccolsperblock);
@@ -293,46 +301,94 @@ std::tuple<DistMatrix<ValueType>, std::vector<ValueType>> DistMatrix<ValueType>:
     return std::make_tuple(QR, tau);
 }
 template<class ValueType>
-DistMatrix<ValueType> DistMatrix<ValueType>::QT_matmul(DistMatrix<ValueType> &b, std::vector<ValueType> &tau) {
-    /*
-     * Calculate Q_b = Q^T * b, TODO: generalize it to LRNT
-     */
-    int m = this->nrows, n = b.ncols;
+DistMatrix<ValueType> DistMatrix<ValueType>::Q_matmul(DistMatrix<ValueType> &b, std::vector<ValueType> &tau, char sideQ, char transQ) {
+    int l = this->nrows;
     int k = this->ncols;
+    int m = b.nrows;
+    int n = b.ncols;
+    int r, c;
 
-    DistMatrix<ValueType> Q_b(m, n, this->nrowsperblock, b.ncolsperblock);
+    // Detect shape mismatch of the two matrices
+    bool mismatch = false;
+    if (sideQ == 'L' && transQ == 'N') {
+        r = l;
+        c = n;
+        if (m != k) mismatch = true;
+    } else if (sideQ == 'L' && transQ == 'T') {
+        r = k;
+        c = n; 
+        if (m != l) mismatch = true; 
+    } else if (sideQ == 'R' && transQ == 'N') {
+        r = m;
+        c = k;
+        if (n != l) mismatch = true; 
+    } else if (sideQ == 'R' && transQ == 'T') {
+        r = m;
+        c = l;
+        if (n != k) mismatch = true; 
+    }
+
+    // Detect shape mismatch of the two matrices
+    if (mismatch) {
+        std::stringstream errmsg;
+        errmsg << "Q(" << this->nrows << ", " << this->ncols << ") does not match b(" << b.nrows << ", " << b.ncols << ")";
+        throw std::logic_error(errmsg.str());
+    }
+
+    DistMatrix<ValueType> Q_b(m, n, b.nrowsperblock, b.ncolsperblock);
     blacs::barrier();
-    printf("creating Q_b\n");
     b.copy_to(Q_b);
 
     int info, lwork = -1, one = 1;
     ValueType worktmp;
-    char U = 'U', N = 'N', L = 'L', R = 'R', T = 'T';
 
     if constexpr (std::is_same_v<ValueType, float>) {
         lwork = -1;
-        psormqr_(&L, &T, &m, &n, &k, (this->array).get(), &one, &one, &(this->desc[0]), tau.data(), Q_b.array.get(), &one, &one, &(Q_b.desc[0]), &worktmp, &lwork, &info);
+        psormqr_(&sideQ, &transQ, &m, &n, &k, (this->array).get(), &one, &one, &(this->desc[0]), tau.data(), Q_b.array.get(), &one, &one, &(Q_b.desc[0]), &worktmp, &lwork, &info);
         check_info(info, "ormqr work query");
         lwork = worktmp;
         std::vector<ValueType> work(lwork);
         work.resize(lwork);
-        psormqr_(&L, &T, &m, &n, &k, (this->array).get(), &one, &one, &(this->desc[0]), tau.data(), Q_b.array.get(), &one, &one, &(Q_b.desc[0]), work.data(), &lwork, &info);
+        psormqr_(&sideQ, &transQ, &m, &n, &k, (this->array).get(), &one, &one, &(this->desc[0]), tau.data(), Q_b.array.get(), &one, &one, &(Q_b.desc[0]), work.data(), &lwork, &info);
         check_info(info, "ormqr");
     } else if constexpr (std::is_same_v<ValueType, double>) {
         lwork = -1;
-        pdormqr_(&L, &T, &m, &n, &k, (this->array).get(), &one, &one, &(this->desc[0]), tau.data(), Q_b.array.get(), &one, &one, &(Q_b.desc[0]), &worktmp, &lwork, &info);
+        pdormqr_(&sideQ, &transQ, &m, &n, &k, (this->array).get(), &one, &one, &(this->desc[0]), tau.data(), Q_b.array.get(), &one, &one, &(Q_b.desc[0]), &worktmp, &lwork, &info);
         check_info(info, "ormqr work query");
         lwork = worktmp;
         std::vector<ValueType> work(lwork);
         work.resize(lwork);
-        pdormqr_(&L, &T, &m, &n, &k, (this->array).get(), &one, &one, &(this->desc[0]), tau.data(), Q_b.array.get(), &one, &one, &(Q_b.desc[0]), work.data(), &lwork, &info);
+        pdormqr_(&sideQ, &transQ, &m, &n, &k, (this->array).get(), &one, &one, &(this->desc[0]), tau.data(), Q_b.array.get(), &one, &one, &(Q_b.desc[0]), work.data(), &lwork, &info);
         check_info(info, "ormqr");
     } else {
-        throw std::logic_error("QT_matmul called with unsupported type!");
+        throw std::logic_error("Q_matmul called with unsupported type!");
     }
 
-    return Q_b;
+    // change shape of Q_b, it originally has the same shape as b
+    if (Q_b.nrows == r && Q_b.ncols == c) {
+        return Q_b;
+    } else {
+        DistMatrix<ValueType> C(r, c);
+
+        // TODO: simplify it using "collect"
+        int syscontext, ptrcontext, bigcontext;
+        int zero = 0;
+        blacs_get_(&zero, &zero, &syscontext);
+        bigcontext = syscontext;
+        blacs_gridinit_(&bigcontext, &blacs::blacslayout, &blacs::nprows, &blacs::npcols);
+
+        if constexpr (std::is_same_v<ValueType, float>) {
+            psgemr2d_(&r, &c, Q_b.array.get(), &one, &one, &(Q_b.desc[0]),
+                      C.array.get(), &one, &one, &(C.desc[0]), &bigcontext);
+        } else if constexpr (std::is_same_v<ValueType, double>) {
+            pdgemr2d_(&r, &c, Q_b.array.get(), &one, &one, &(Q_b.desc[0]),
+                      C.array.get(), &one, &one, &(C.desc[0]), &bigcontext);
+        }
+
+        return C;
+    }
 }
+
 template<class ValueType>
 DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
     if (this->nrows != this->ncols) {
@@ -522,7 +578,7 @@ void DistMatrix<ValueType>::scatter(ValueType *ptr, int i0, int j0, int p, int q
         pigemr2d_(&p, &q, ptr, &one, &one, &serialdesc[0],
                   this->array.get(), &i, &j, &desc[0], &bigcontext);
     } else {
-        throw std::logic_error("matmul called with unsupported type");
+        throw std::logic_error("scatter called with unsupported type");
     }
     blacs::barrier();
     if (blacs::mpirank == 0) {
@@ -581,7 +637,7 @@ void DistMatrix<ValueType>::collect(ValueType *ptr, int i0, int j0, int p, int q
         pigemr2d_(&p, &q, ptr, &one, &one, &ptrdesc[0],
                   this->array.get(), &i, &j, &desc[0], &bigcontext);
     } else {
-        throw std::logic_error("matmul called with unsupported type");
+        throw std::logic_error("collect called with unsupported type");
     }
     blacs::barrier();
     blacs_gridexit_(&ptrcontext);
@@ -629,7 +685,7 @@ void DistMatrix<ValueType>::gather(ValueType *ptr) {
         pigemr2d_(&m, &n, this->array.get(), &one, &one, &desc[0],
                   ptr, &one, &one, &serialdesc[0], &bigcontext);
     } else {
-        throw std::logic_error("matmul called with unsupported type");
+        throw std::logic_error("gather called with unsupported type");
     }
     blacs::barrier();
     if (blacs::mpirank == 0) {

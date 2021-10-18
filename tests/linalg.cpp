@@ -33,6 +33,19 @@ TEST_CASE_TEMPLATE("matrix multiplication", MatType, DistMatrix<double>) {
         return std::norm(C(i, j) - Ceig(i, j));
     };
     REQUIRE(difference.sum() < 1e-12);
+
+    const int l = 18;
+    MatType D(n, l);
+    Eigen::Matrix<double, n, l> Deig = Eigen::Matrix<double, n, l>::Random();
+    D = [&Deig](int i, int j) {
+        return Deig(i, j);
+    };
+    try {
+        MatType E = A.matmul(D, 1, 'N', 'T');
+    } catch(std::logic_error matmul_exp) {
+        std::cout << matmul_exp.what() << std::endl;
+    }
+
 }
 
 //TEST_CASE_TEMPLATE("QR matrix inversion", MatType, DistMatrix<double>) {
@@ -89,7 +102,9 @@ TEST_CASE_TEMPLATE("QR matrix multiplication", MatType, DistMatrix<double>) {
     MatType R(n, n);
     R = [&QR](int i, int j) { return i > j ? 0 : QR(i, j); };
     MatType Rinv = R.triangular_invert('U');
-    MatType Q_b = QR.QT_matmul(b, tau);
+    std::cout << "QR size " << QR.nrows << " " << QR.ncols << std::endl;
+    std::cout << "b size " << b.nrows << " " << b.ncols << std::endl;
+    MatType Q_b = QR.Q_matmul(b, tau, 'L', 'T');
     std::cout << "Q_b size " << Q_b.nrows << " " << Q_b.ncols << std::endl;
     MatType alpha = Rinv.matmul(Q_b, 1.0, 'N', 'N');
     std::cout << "Done distmatrix alpha" << std::endl;

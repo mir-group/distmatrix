@@ -152,7 +152,13 @@ Matrix<ValueType> Matrix<ValueType>::matmul(const Matrix<ValueType> &B, const Va
     Matrix<ValueType> C(nlocalrows, B.nlocalcols);
     ValueType beta(0);
     ValueType *A_ptr = array.get(), *B_ptr = B.array.get(), *C_ptr = C.array.get();
-    int m = nlocalrows, k = nlocalcols, n = B.nlocalcols;
+    int m = nlocalrows, k = nlocalcols, n = B.nlocalcols, l = B.nlocalrows;
+    if (k != l) {
+        //str::string errmsg = "A(" + std::to_string(m) + ", " + std::to_string(k) + ") does not match B(" + std::to_string(l) + ", " + std::to_string(n) + ")";
+        std::stringstream errmsg;
+        errmsg << "A(" << m << ", " << k << ") does not match B(" << l << ", " << n << ")";
+        throw std::logic_error(errmsg.str());
+    }
 
     if constexpr (std::is_same_v<ValueType, float>) {
         cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, m, n, k, alpha, A_ptr, m, B_ptr, k, beta, C_ptr, m);
