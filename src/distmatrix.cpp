@@ -41,8 +41,6 @@ DistMatrix<ValueType>::DistMatrix(int ndistrows, int ndistcols, int nrowsperbloc
     this->nlocal = (this->nlocalrows) * (this->nlocalcols);
     this->array = std::shared_ptr<ValueType[]>(new ValueType[this->nlocal]);
 
-    //printf("ip = %d, jp = %d, ndistrows = %d, ndistcols = %d, nlocalrows = %d\n",
-    //     blacs::myprow, blacs::mypcol, ndistrows, ndistcols, this->nlocalrows);
     descinit_(&desc[0], &ndistrows, &ndistcols, &nrowsperblock, &ncolsperblock, &zero, &zero, &blacs::blacscontext, &this->nlocalrows, &info);
     if (info != 0) {
         std::cerr << "info = " << info << std::endl;
@@ -167,8 +165,6 @@ std::pair<int, int> DistMatrix<ValueType>::getlocalsizes(int ip, int jp) {
     int zero = 0;
     int nlocalrows = numroc_(&(this->nrows), &nrowsperblock, &ip, &zero, &blacs::nprows);
     int nlocalcols = numroc_(&(this->ncols), &ncolsperblock, &jp, &zero, &blacs::npcols);
-    //printf("ip = %d, jp = %d, nrows = %d, ncols = %d, nrowsperblock = %d, ncolsperblock = %d, nprows = %d, npcols = %d, nlocalrows = %d, nlocalcols = %d\n",
-    //     ip, jp, this->nrows, this->ncols, nrowsperblock, ncolsperblock, blacs::nprows, blacs::npcols, nlocalrows, nlocalcols);
     return {nlocalrows, nlocalcols};
 }
 
@@ -267,12 +263,9 @@ std::tuple<DistMatrix<ValueType>, std::vector<ValueType>> DistMatrix<ValueType>:
     }
 
     blacs::barrier();
-    printf("creating QR\n");
     DistMatrix<ValueType> QR(this->nrows, this->ncols, this->nrowsperblock, this->ncolsperblock);
     blacs::barrier();
-    printf("barrier\n");
     this->copy_to(QR);
-    printf("copied\n");
     std::vector<ValueType> tau(this->nlocalrows);
 
     int info, lwork = -1, one = 1;
@@ -396,15 +389,11 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
     }
 
     blacs::barrier();
-    printf("creating QR\n");
     DistMatrix<ValueType> QR(this->nrows, this->ncols, this->nrowsperblock, this->ncolsperblock);
     blacs::barrier();
-    printf("creating Ainv\n");
     blacs::barrier();
-    //DistMatrix<ValueType> Ainv(this->nrows, this->ncols, this->nrowsperblock, this->ncolsperblock);
     DistMatrix<ValueType> Ainv(this->ncols, this->nrows, this->ncolsperblock, this->nrowsperblock);
     blacs::barrier();
-    printf("copying A to QR\n");
     this->copy_to(QR);
     std::vector<ValueType> tau(this->nlocalrows);
 
@@ -451,7 +440,6 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
         psormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), work.data(), &lwork, &info);
         check_info(info, "ormqr");
     } else if constexpr (std::is_same_v<ValueType, double>) {
-        printf("begin pdgeqrf\n");
         pdgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), &worktmp, &lwork, &info);
         check_info(info, "geqrf work query");
         lwork = worktmp;
@@ -459,12 +447,10 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
         pdgeqrf_(&m, &n, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), work.data(), &lwork, &info);
         check_info(info, "geqrf");
         QR.copy_to(Ainv);
-        printf("Done pdgeqrf\n");
 
         //pdtrtri_(&U, &N, &n, Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &info);
         pdtrtri_(&U, &N, &m, Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &info);
         check_info(info, "trtri");
-        printf("Done invert tri\n");
 
         /*
          * Set lower triangular part of Ainv to zero.
@@ -472,7 +458,6 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
         Ainv = [](ValueType Ainvij, int i, int j) {
             return i > j ? 0 : Ainvij;
         };
-        printf("set lower tri of A\n");
 
         lwork = -1;
         pdormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), &worktmp, &lwork, &info);
@@ -481,7 +466,6 @@ DistMatrix<ValueType> DistMatrix<ValueType>::qr_invert() {
         work.resize(lwork);
         pdormqr_(&R, &T, &m, &n, &m, QR.array.get(), &one, &one, &(QR.desc[0]), tau.data(), Ainv.array.get(), &one, &one, &(Ainv.desc[0]), work.data(), &lwork, &info);
         check_info(info, "ormqr");
-        printf("Done pdormqr\n");
     } else {
         throw std::logic_error("qr_invert called with unsupported type!");
     }
@@ -645,7 +629,7 @@ void DistMatrix<ValueType>::collect(ValueType *ptr, int i0, int j0, int p, int q
 
 
 template<class ValueType>
-void DistMatrix<ValueType>::gather(ValueType *ptr) {
+void DistMatrix<ValueType>::gather(ValueType *ptr, int i0, int j0, int p, int q) {
 
     int syscontext, allcontext, serialcontext, bigcontext;
     int nprows, npcols, myprow, mypcol;
@@ -653,6 +637,8 @@ void DistMatrix<ValueType>::gather(ValueType *ptr) {
 
     int info, what = -1, one = 1, zero = 0, m = this->nrows, n = this->ncols;
     int serialdesc[9];
+    int i = i0 + 1;
+    int j = j0 + 1;
 
     // get the system default context
     blacs_get_(&zero, &zero, &syscontext);
@@ -664,25 +650,25 @@ void DistMatrix<ValueType>::gather(ValueType *ptr) {
     blacs_gridinit_(&serialcontext, &blacs::blacslayout, &one, &one);
 
     if (blacs::mpirank == 0) {
-        descinit_(&serialdesc[0], &m, &n, &m, &n, &zero, &zero, &serialcontext, &m, &info);
+        descinit_(&serialdesc[0], &p, &q, &p, &q, &zero, &zero, &serialcontext, &p, &info);
         check_info(info, "descinit gather");
     }
     MPI_Bcast(&serialdesc, 9, MPI_INT, 0, MPI_COMM_WORLD);
 
     if constexpr (std::is_same_v<ValueType, float>) {
-        psgemr2d_(&m, &n, this->array.get(), &one, &one, &desc[0],
+        psgemr2d_(&p, &q, this->array.get(), &i, &j, &desc[0],
                   ptr, &one, &one, &serialdesc[0], &bigcontext);
     } else if constexpr (std::is_same_v<ValueType, double>) {
-        pdgemr2d_(&m, &n, this->array.get(), &one, &one, &desc[0],
+        pdgemr2d_(&p, &q, this->array.get(), &i, &j, &desc[0],
                   ptr, &one, &one, &serialdesc[0], &bigcontext);
     } else if constexpr (std::is_same_v<ValueType, std::complex<float>>) {
-        pcgemr2d_(&m, &n, this->array.get(), &one, &one, &desc[0],
+        pcgemr2d_(&p, &q, this->array.get(), &i, &j, &desc[0],
                   ptr, &one, &one, &serialdesc[0], &bigcontext);
     } else if constexpr (std::is_same_v<ValueType, std::complex<double>>) {
-        pzgemr2d_(&m, &n, this->array.get(), &one, &one, &desc[0],
+        pzgemr2d_(&p, &q, this->array.get(), &i, &j, &desc[0],
                   ptr, &one, &one, &serialdesc[0], &bigcontext);
     } else if constexpr (std::is_same_v<ValueType, int>) {
-        pigemr2d_(&m, &n, this->array.get(), &one, &one, &desc[0],
+        pigemr2d_(&p, &q, this->array.get(), &i, &j, &desc[0],
                   ptr, &one, &one, &serialdesc[0], &bigcontext);
     } else {
         throw std::logic_error("gather called with unsupported type");
@@ -694,9 +680,9 @@ void DistMatrix<ValueType>::gather(ValueType *ptr) {
 }
 
 template<class ValueType>
-void DistMatrix<ValueType>::allgather(ValueType *ptr) {
-    gather(ptr);
-    MPI_Bcast(ptr, this->nrows * this->ncols, mpitype, 0, MPI_COMM_WORLD);
+void DistMatrix<ValueType>::allgather(ValueType *ptr, int i0, int j0, int p, int q) {
+    gather(ptr, i0, j0, p, q);
+    MPI_Bcast(ptr, p * q, mpitype, 0, MPI_COMM_WORLD);
 }
 
 template<class ValueType>

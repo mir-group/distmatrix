@@ -115,7 +115,7 @@ TEST_CASE_TEMPLATE("gather and allgather", ValueType, int, float, double) {
         return 2 * i + j * j;
     };
     blacs::barrier();
-    Matrix<ValueType> Aserial(m, n);
+    Matrix<ValueType> Aserial(m - 1, n - 2);
 
     DistMatrix<ValueType> B(m, n);
     B = [](int i, int j) {
@@ -124,27 +124,41 @@ TEST_CASE_TEMPLATE("gather and allgather", ValueType, int, float, double) {
     Matrix<ValueType> Bserial(m, n);
     blacs::barrier();
     SUBCASE("gather") {
-        A.gather(Aserial.array.get());
-        B.gather(Bserial.array.get());
+        A.gather(Aserial.array.get(), 1, 2, m - 1, n - 2);
+        B.gather(Bserial.array.get(), 0, 0, m, n);
 
-        Matrix<int> check(m, n);
-        check = [&Aserial](int i, int j) {
-            return Aserial(i, j) == 2 * i + j * j;
+        Matrix<int> checkA(m - 1, n - 2);
+        checkA = [&Aserial](int i, int j) {
+            return Aserial(i, j) == 2 * (i + 1) + (j + 2) * (j + 2);
         };
         if (blacs::mpirank == 0) {
-            REQUIRE((check.sum() == m * n));
+            REQUIRE((checkA.sum() == (m - 1) * (n - 2)));
+        }
+
+        Matrix<int> checkB(m, n);
+        checkB = [&Bserial](int i, int j) {
+            return Bserial(i, j) == 2 * i + j * j;
+        };
+        if (blacs::mpirank == 0) {
+            REQUIRE((checkB.sum() == m * n));
         }
 
     }
     SUBCASE("allgather") {
-        A.allgather(Aserial.array.get());
-        B.allgather(Bserial.array.get());
+        A.allgather(Aserial.array.get(), 1, 2, m - 1, n - 2);
+        B.allgather(Bserial.array.get(), 0, 0, m, n);
 
-        Matrix<int> check(m, n);
-        check = [&Aserial](int i, int j) {
-            return Aserial(i, j) == 2 * i + j * j;
+        Matrix<int> checkA(m - 1, n - 2);
+        checkA = [&Aserial](int i, int j) {
+            return Aserial(i, j) == 2 * (i + 1) + (j + 2) * (j + 2);
         };
-        REQUIRE((check.sum() == m * n));
+        REQUIRE((checkA.sum() == (m - 1) * (n - 2)));
+
+        Matrix<int> checkB(m, n);
+        checkB = [&Bserial](int i, int j) {
+            return Bserial(i, j) == 2 * i + j * j;
+        };
+        REQUIRE((checkB.sum() == m * n));
     }
 }
 

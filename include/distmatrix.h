@@ -171,7 +171,7 @@ public:
      * or `A.array.get()` if A is a `Matrix<ValueType>`.
      * @param ptr Pointer to the array where the matrix will be written.
      */
-    void gather(ValueType *ptr);
+    void gather(ValueType *ptr, int i0, int j0, int p, int q);
 
     /**
      * Gather the entire matrix in the local array pointed to by `ptr` on MPI rank 0
@@ -181,7 +181,7 @@ public:
      * or `A.array.get()` if A is a `Matrix<ValueType>`.
      * @param ptr Pointer to the array where the matrix will be written.
      */
-    void allgather(ValueType *ptr);
+    void allgather(ValueType *ptr, int i0, int j0, int p, int q);
 
     /**
      * Convert flat local index to local row and column index.
